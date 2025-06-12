@@ -2,8 +2,8 @@
 "use client"
 
 import { useEffect, useState } from 'react';
-import { getProjectById, ministries, states } from '@/lib/data'; 
-import type { Project, Feedback as FeedbackType } from '@/types';
+import { getProjectById } from '@/lib/data'; 
+import type { Project } from '@/types';
 import { ImageGallery } from '@/components/projects/image-gallery';
 import { FeedbackForm } from '@/components/projects/feedback-form';
 import { FeedbackList } from '@/components/projects/feedback-list';
@@ -14,21 +14,23 @@ import { notFound } from 'next/navigation';
 import { CalendarDays, MapPin, Briefcase, DollarSign, Info, Users, MessageSquare, ThumbsUp, TrendingUp, PlayCircle } from 'lucide-react';
 import Link from 'next/link';
 import { VideoCard } from '@/components/common/video-card';
+import { Button } from '@/components/ui/button';
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params; // Destructure id from params
   const [project, setProject] = useState<Project | null | undefined>(undefined); 
 
   const refreshFeedback = () => {
-    const updatedProject = getProjectById(params.id); 
+    const updatedProject = getProjectById(id); // Use destructured id
     if (updatedProject) {
       setProject(updatedProject);
     }
   };
   
   useEffect(() => {
-    const fetchedProject = getProjectById(params.id);
+    const fetchedProject = getProjectById(id); // Use destructured id
     setProject(fetchedProject);
-  }, [params.id]);
+  }, [id]); // Use id as dependency
 
   if (project === undefined) { 
     return (
@@ -173,7 +175,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <h3 className="font-headline text-xl font-semibold mb-4">Share Your Thoughts</h3>
-            <FeedbackForm projectId={project.id} onFeedbackSubmitted={refreshFeedback} />
+            <FeedbackForm projectId={id} onFeedbackSubmitted={refreshFeedback} />
           </div>
           <div>
             <h3 className="font-headline text-xl font-semibold mb-4">Recent Feedback</h3>
