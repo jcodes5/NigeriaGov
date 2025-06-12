@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -75,7 +76,7 @@ const DashboardSidebarContent = () => {
         <ScrollArea className="h-full">
         <SidebarMenu>
           <SidebarMenuItem>
-             <Link href="/" passHref legacyBehavior>
+             <Link href="/">
                 <SidebarMenuButton onClick={closeMobileSidebar} isActive={pathname === '/'} tooltip="Back to Homepage">
                   <Home />
                   Homepage
@@ -85,7 +86,7 @@ const DashboardSidebarContent = () => {
 
           {commonLinks.map((link) => (
             <SidebarMenuItem key={link.href}>
-              <Link href={link.href} passHref legacyBehavior>
+              <Link href={link.href}>
                 <SidebarMenuButton onClick={closeMobileSidebar} isActive={pathname === link.href} tooltip={link.label}>
                   <link.icon />
                   {link.label}
@@ -98,7 +99,7 @@ const DashboardSidebarContent = () => {
               <SidebarMenuSubButton className="font-semibold text-muted-foreground mt-4 mb-1">Admin Tools</SidebarMenuSubButton>
               {adminLinks.map((link) => (
                 <SidebarMenuItem key={link.href}>
-                  <Link href={link.href} passHref legacyBehavior>
+                  <Link href={link.href}>
                     <SidebarMenuButton onClick={closeMobileSidebar} isActive={pathname === link.href} tooltip={link.label}>
                       <link.icon />
                       {link.label}
