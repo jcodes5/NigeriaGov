@@ -1,0 +1,152 @@
+"use client";
+
+import { useAuth } from "@/context/auth-context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Users, FileText, BarChart3, ShieldAlert, Settings } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import Image from "next/image";
+
+
+export default function AdminDashboardPage() {
+  const { user, isAdmin, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAdmin) {
+      // If not loading and not an admin, redirect or show an error
+      toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+      router.replace("/dashboard/user"); // Or to a specific access denied page
+    }
+  }, [user, isAdmin, isLoading, router]);
+
+  if (isLoading || !isAdmin) {
+     return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-3 text-lg">Verifying admin access...</p>
+      </div>
+    );
+  }
+  
+  // Mock data for admin overview
+  const totalProjects = 150;
+  const pendingApprovals = 5;
+  const totalUsers = 1250;
+  const siteHealth = "Good";
+
+  return (
+    <div className="space-y-8">
+      <Card className="bg-gradient-to-r from-primary/10 via-background to-background shadow-sm">
+        <CardHeader>
+           <div className="flex items-center space-x-4">
+            <Image 
+                src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Admin')}&background=13714C&color=fff&font-size=0.5`} 
+                alt={user?.name || 'Admin'} 
+                width={80} 
+                height={80} 
+                className="rounded-full border-2 border-primary"
+            />
+            <div>
+                <CardTitle className="font-headline text-3xl text-primary">Administrator Dashboard</CardTitle>
+                <CardDescription className="text-md text-foreground/80">Manage NigeriaGovHub content and users.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+            <BarChart3 className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalProjects}</div>
+            <p className="text-xs text-muted-foreground">
+              Live and archived projects.
+            </p>
+          </CardContent>
+        </Card>
+         <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+            <FileText className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{pendingApprovals}</div>
+            <p className="text-xs text-muted-foreground">
+              Feedback or content awaiting review.
+            </p>
+          </CardContent>
+        </Card>
+         <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Registered Users</CardTitle>
+            <Users className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+            <p className="text-xs text-muted-foreground">
+              Total active and inactive users.
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Site Health</CardTitle>
+            <ShieldAlert className="h-5 w-5 text-green-500" /> {/* Assuming Good health */}
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{siteHealth}</div>
+            <p className="text-xs text-muted-foreground">
+              Overall system status.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline">Admin Tools</CardTitle>
+        </CardHeader>
+        <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/manage-projects" className="flex items-start space-x-3">
+                    <BarChart3 className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Manage Projects</p>
+                        <p className="text-xs text-muted-foreground">Add, edit, or remove project listings.</p>
+                    </div>
+                </Link>
+            </Button>
+             <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/manage-users" className="flex items-start space-x-3">
+                    <Users className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Manage Users</p>
+                        <p className="text-xs text-muted-foreground">View user activity and manage accounts.</p>
+                    </div>
+                </Link>
+            </Button>
+            <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/site-settings" className="flex items-start space-x-3">
+                    <Settings className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Site Settings</p>
+                        <p className="text-xs text-muted-foreground">Configure global application settings.</p>
+                    </div>
+                </Link>
+            </Button>
+        </CardContent>
+      </Card>
+
+    </div>
+  );
+}
+
+// This component might use useToast for notifications.
+import { useToast } from "@/hooks/use-toast";
+const { toast } = useToast(); // Initialize toast if needed.
