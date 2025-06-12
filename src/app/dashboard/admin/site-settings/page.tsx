@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -23,7 +24,6 @@ const settingsSchema = z.object({
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
-// Mock current settings
 const currentSettings: SettingsFormData = {
   siteName: "NigeriaGovHub",
   maintenanceMode: false,
@@ -39,7 +39,7 @@ export default function SiteSettingsPage() {
   
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: currentSettings, // Initialize with mock/fetched settings
+    defaultValues: currentSettings, 
   });
   
   useEffect(() => {
@@ -48,21 +48,16 @@ export default function SiteSettingsPage() {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
-        // User is admin, potentially fetch and reset form with actual current settings
-        // For now, defaultValues in useForm handles initial state with mock data.
-        // If fetching real settings:
-        // const fetchedSettings = await fetchSiteSettings(); 
-        // reset(fetchedSettings);
+        // reset(fetchedSettings); // If fetching real settings
       }
     }
   }, [user, isAdmin, authLoading, router, toast, reset]);
 
 
   const onSubmit: SubmitHandler<SettingsFormData> = async (data) => {
-    // Simulate API call to save settings
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log("Settings saved:", data);
-    Object.assign(currentSettings, data); // Update mock current settings
+    Object.assign(currentSettings, data); 
     toast({
       title: "Settings Saved",
       description: "Site settings have been successfully updated.",
@@ -135,11 +130,11 @@ export default function SiteSettingsPage() {
           </CardContent>
         </Card>
         
-        <div className="mt-8 flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => reset(currentSettings)} disabled={isSubmitting}>
+        <div className="mt-8 flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => reset(currentSettings)} disabled={isSubmitting} className="w-full sm:w-auto">
                 Reset to Defaults
             </Button>
-            <Button type="submit" className="button-hover" disabled={isSubmitting}>
+            <Button type="submit" className="button-hover w-full sm:w-auto" disabled={isSubmitting}>
                 {isSubmitting ? "Saving..." : "Save Settings"}
             </Button>
         </div>

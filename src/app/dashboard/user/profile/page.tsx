@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -14,13 +15,12 @@ import Image from "next/image";
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Invalid email address."),
-  // Add more fields like currentPassword, newPassword if password change is needed
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function UserProfilePage() {
-  const { user, login } = useAuth(); // login can be used to update user context if details change
+  const { user, login } = useAuth(); 
   const { toast } = useToast();
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ProfileFormData>({
@@ -32,13 +32,11 @@ export default function UserProfilePage() {
   });
 
   const onSubmit: SubmitHandler<ProfileFormData> = async (data) => {
-    // Simulate API call to update profile
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Update user context (in a real app, this would come from API response)
     if (user) {
       const updatedUser = { ...user, name: data.name, email: data.email };
-      login(updatedUser); // This updates the user in AuthContext and localStorage
+      login(updatedUser); 
     }
 
     toast({
@@ -94,12 +92,12 @@ export default function UserProfilePage() {
                             <Input id="email" type="email" {...register("email")} className="mt-1" />
                             {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
                         </div>
-                        {/* Password change fields can be added here */}
-                        <div className="flex justify-end space-x-2">
-                             <Button type="button" variant="outline" onClick={() => reset({ name: user.name, email: user.email })} disabled={isSubmitting}>
+                        
+                        <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                             <Button type="button" variant="outline" onClick={() => reset({ name: user.name, email: user.email })} disabled={isSubmitting} className="w-full sm:w-auto">
                                 Cancel
                             </Button>
-                            <Button type="submit" className="button-hover" disabled={isSubmitting}>
+                            <Button type="submit" className="button-hover w-full sm:w-auto" disabled={isSubmitting}>
                                 {isSubmitting ? "Saving..." : "Save Changes"}
                             </Button>
                         </div>

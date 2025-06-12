@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -8,21 +9,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Image from "next/image";
-import { useToast } from "@/hooks/use-toast"; // Ensure useToast is imported
+import { useToast } from "@/hooks/use-toast"; 
 
 export default function AdminDashboardPage() {
   const { user, isAdmin, isLoading } = useAuth();
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast at the beginning of the component
+  const { toast } = useToast(); 
 
   useEffect(() => {
     if (!isLoading && !isAdmin) {
       toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
       router.replace("/dashboard/user"); 
     }
-  }, [user, isAdmin, isLoading, router, toast]); // Added toast to dependencies
+  }, [user, isAdmin, isLoading, router, toast]); 
 
-  if (isLoading || !isAdmin) { // This check handles loading state and non-admin access before useEffect kicks in or after
+  if (isLoading || !isAdmin) { 
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -31,7 +32,6 @@ export default function AdminDashboardPage() {
     );
   }
   
-  // Mock data for admin overview
   const totalProjects = 150;
   const pendingApprovals = 5;
   const totalUsers = 1250;
@@ -41,13 +41,13 @@ export default function AdminDashboardPage() {
     <div className="space-y-8">
       <Card className="bg-gradient-to-r from-primary/10 via-background to-background shadow-sm">
         <CardHeader>
-           <div className="flex items-center space-x-4">
+           <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:space-x-4 space-y-2 sm:space-y-0">
             <Image 
                 src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Admin')}&background=13714C&color=fff&font-size=0.5`} 
                 alt={user?.name || 'Admin'} 
                 width={80} 
                 height={80} 
-                className="rounded-full border-2 border-primary"
+                className="rounded-full border-2 border-primary shrink-0"
             />
             <div>
                 <CardTitle className="font-headline text-3xl text-primary">Administrator Dashboard</CardTitle>
@@ -97,7 +97,7 @@ export default function AdminDashboardPage() {
         <Card className="card-hover shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Site Health</CardTitle>
-            <ShieldAlert className="h-5 w-5 text-green-500" /> {/* Assuming Good health */}
+            <ShieldAlert className="h-5 w-5 text-green-500" /> 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{siteHealth}</div>

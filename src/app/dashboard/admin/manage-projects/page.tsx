@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -25,7 +26,6 @@ export default function ManageProjectsPage() {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
-        // User is admin, load projects
         setProjects(mockProjectsData);
       }
     }
@@ -50,12 +50,12 @@ export default function ManageProjectsPage() {
   return (
     <div className="space-y-8">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <CardTitle className="font-headline text-2xl">Manage Projects</CardTitle>
             <CardDescription>Add, edit, and oversee all government projects.</CardDescription>
           </div>
-          <Button className="button-hover">
+          <Button className="button-hover w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4"/> Add New Project
           </Button>
         </CardHeader>

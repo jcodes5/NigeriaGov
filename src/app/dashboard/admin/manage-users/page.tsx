@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -33,7 +34,6 @@ export default function ManageUsersPage() {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
-        // User is admin, load users
         setUsers(mockUsers);
       }
     }
@@ -51,12 +51,12 @@ export default function ManageUsersPage() {
   return (
     <div className="space-y-8">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <CardTitle className="font-headline text-2xl">Manage Users</CardTitle>
             <CardDescription>View, edit, and manage user accounts.</CardDescription>
           </div>
-          <Button className="button-hover">
+          <Button className="button-hover w-full sm:w-auto">
             <UserPlus className="mr-2 h-4 w-4"/> Add New User
           </Button>
         </CardHeader>
@@ -70,7 +70,7 @@ export default function ManageUsersPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead> {/* Example: Active/Inactive */}
+                <TableHead>Status</TableHead> 
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -85,7 +85,7 @@ export default function ManageUsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-green-600 border-green-600">Active</Badge> {/* Mock status */}
+                    <Badge variant="outline" className="text-green-600 border-green-600">Active</Badge> 
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

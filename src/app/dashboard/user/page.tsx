@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -14,7 +15,6 @@ export default function UserDashboardPage() {
     return <p>Please log in to view your dashboard.</p>;
   }
 
-  // Mock data for user activity
   const recentFeedbackCount = 5;
   const bookmarkedProjectsCount = 3;
   const averageRatingGiven = 4.2;
@@ -24,13 +24,13 @@ export default function UserDashboardPage() {
     <div className="space-y-8">
       <Card className="bg-gradient-to-r from-primary/10 via-background to-background shadow-sm">
         <CardHeader>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:space-x-4 space-y-2 sm:space-y-0">
             <Image 
-                src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=0D8ABC&color=fff&font-size=0.5`} 
+                src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=13714C&color=fff&font-size=0.5`} 
                 alt={user.name} 
                 width={80} 
                 height={80} 
-                className="rounded-full border-2 border-primary"
+                className="rounded-full border-2 border-primary shrink-0"
             />
             <div>
                 <CardTitle className="font-headline text-3xl text-primary">Welcome, {user.name}!</CardTitle>
@@ -104,7 +104,7 @@ export default function UserDashboardPage() {
             </Button>
             <Button variant="default" asChild className="button-hover justify-start p-6 text-left h-auto sm:col-span-2 lg:col-span-1">
                 <Link href="/projects" className="flex items-start space-x-3">
-                    <MessageSquare className="h-6 w-6 mt-1"/> {/* Using MessageSquare as Find Projects icon */}
+                    <MessageSquare className="h-6 w-6 mt-1"/> 
                     <div>
                         <p className="font-semibold">Explore Projects</p>
                         <p className="text-xs ">Discover new projects and initiatives.</p>
