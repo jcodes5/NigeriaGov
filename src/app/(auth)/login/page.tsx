@@ -2,6 +2,7 @@ import { LoginForm } from '@/components/auth/login-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
   return (
