@@ -8,21 +8,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Image from "next/image";
-
+import { useToast } from "@/hooks/use-toast"; // Ensure useToast is imported
 
 export default function AdminDashboardPage() {
   const { user, isAdmin, isLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast(); // Initialize toast at the beginning of the component
 
   useEffect(() => {
     if (!isLoading && !isAdmin) {
-      // If not loading and not an admin, redirect or show an error
       toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-      router.replace("/dashboard/user"); // Or to a specific access denied page
+      router.replace("/dashboard/user"); 
     }
-  }, [user, isAdmin, isLoading, router]);
+  }, [user, isAdmin, isLoading, router, toast]); // Added toast to dependencies
 
-  if (isLoading || !isAdmin) {
+  if (isLoading || !isAdmin) { // This check handles loading state and non-admin access before useEffect kicks in or after
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -146,7 +146,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-// This component might use useToast for notifications.
-import { useToast } from "@/hooks/use-toast";
-const { toast } = useToast(); // Initialize toast if needed.

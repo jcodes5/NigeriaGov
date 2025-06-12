@@ -37,7 +37,7 @@ export default function BenefitsPage() {
           <ul className="list-disc list-inside space-y-1">
             <li>National Social Investment Programs (NSIP) components like N-Power, Conditional Cash Transfers.</li>
             <li>Educational grants and scholarships.</li>
-            <li>Youth empowerment schemes.
+            <li>Youth empowerment schemes.</li>
             <li>Housing assistance programs.</li>
             <li>Support for persons with disabilities.</li>
             <li>Pension schemes and retiree benefits.</li>

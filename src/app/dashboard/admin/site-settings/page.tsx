@@ -12,6 +12,7 @@ import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const settingsSchema = z.object({
   siteName: z.string().min(3, "Site name must be at least 3 characters."),
@@ -32,26 +33,29 @@ const currentSettings: SettingsFormData = {
 
 
 export default function SiteSettingsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
-  const [pageLoading, setPageLoading] = useState(true);
-
+  
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: currentSettings,
+    defaultValues: currentSettings, // Initialize with mock/fetched settings
   });
   
   useEffect(() => {
     if (!authLoading) {
-      if (isAdmin) {
-        // In a real app, fetch current settings here and reset(fetchedSettings)
-        setPageLoading(false);
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
       } else {
-        console.error("Access denied: User is not an admin.");
-        setPageLoading(false); 
+        // User is admin, potentially fetch and reset form with actual current settings
+        // For now, defaultValues in useForm handles initial state with mock data.
+        // If fetching real settings:
+        // const fetchedSettings = await fetchSiteSettings(); 
+        // reset(fetchedSettings);
       }
     }
-  }, [isAdmin, authLoading, reset]);
+  }, [user, isAdmin, authLoading, router, toast, reset]);
 
 
   const onSubmit: SubmitHandler<SettingsFormData> = async (data) => {
@@ -65,14 +69,14 @@ export default function SiteSettingsPage() {
     });
   };
   
-  if (authLoading || pageLoading) {
-    return <p>Loading site settings...</p>;
+  if (authLoading || !isAdmin) {
+     return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-3 text-lg">Verifying admin access and loading settings...</p>
+      </div>
+    );
   }
-
-  if (!isAdmin) {
-    return <p>Access Denied. You must be an administrator to view this page.</p>
-  }
-
 
   return (
     <div className="space-y-8">

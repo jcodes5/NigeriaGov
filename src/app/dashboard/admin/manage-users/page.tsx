@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
-import type { User } from "@/types"; // Assuming User type exists
+import type { User } from "@/types";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 // Mock user data
 const mockUsers: User[] = [
@@ -20,32 +22,31 @@ const mockUsers: User[] = [
 
 
 export default function ManageUsersPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
-  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading) {
-      if (isAdmin) {
-        // Simulate fetching users
-        setUsers(mockUsers);
-        setPageLoading(false);
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
       } else {
-        // Handle non-admin access, perhaps redirect or show error
-        console.error("Access denied: User is not an admin.");
-        setPageLoading(false); 
+        // User is admin, load users
+        setUsers(mockUsers);
       }
     }
-  }, [isAdmin, authLoading]);
+  }, [user, isAdmin, authLoading, router, toast]);
 
-  if (authLoading || pageLoading) {
-    return <p>Loading user management...</p>;
+  if (authLoading || !isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-3 text-lg">Verifying admin access and loading users...</p>
+      </div>
+    );
   }
-
-  if (!isAdmin) {
-    return <p>Access Denied. You must be an administrator to view this page.</p>
-  }
-
 
   return (
     <div className="space-y-8">
@@ -108,7 +109,6 @@ export default function ManageUsersPage() {
           </Table>
         </CardContent>
       </Card>
-      {/* Add Pagination if many users */}
     </div>
   );
 }

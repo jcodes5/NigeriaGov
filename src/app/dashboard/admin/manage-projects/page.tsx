@@ -9,31 +9,35 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import type { Project } from "@/types"; 
-import { projects as mockProjectsData } from "@/lib/data"; // Mock data
+import { projects as mockProjectsData } from "@/lib/data"; 
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ManageProjectsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [pageLoading, setPageLoading] = useState(true);
 
-   useEffect(() => {
+  useEffect(() => {
     if (!authLoading) {
-      if (isAdmin) {
-        setProjects(mockProjectsData); // Use mock data
-        setPageLoading(false);
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
       } else {
-        console.error("Access denied: User is not an admin.");
-        setPageLoading(false); 
+        // User is admin, load projects
+        setProjects(mockProjectsData);
       }
     }
-  }, [isAdmin, authLoading]);
+  }, [user, isAdmin, authLoading, router, toast]);
 
-  if (authLoading || pageLoading) {
-    return <p>Loading project management...</p>;
-  }
-
-  if (!isAdmin) {
-    return <p>Access Denied. You must be an administrator to view this page.</p>
+  if (authLoading || !isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-3 text-lg">Verifying admin access and loading projects...</p>
+      </div>
+    );
   }
 
   const statusColors: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -104,7 +108,6 @@ export default function ManageProjectsPage() {
           </Table>
         </CardContent>
       </Card>
-      {/* Add Pagination if many projects */}
     </div>
   );
 }
