@@ -1,13 +1,27 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+"use client";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 
 export default function TermsOfServicePage() {
+  const [lastUpdatedDate, setLastUpdatedDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLastUpdatedDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+  }, []);
+  
   return (
     <div className="space-y-8 py-8">
       <section className="text-center">
         <h1 className="font-headline text-4xl md:text-5xl font-bold text-primary mb-4">Terms of Service</h1>
-        <p className="text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto">
-          Last Updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+        {lastUpdatedDate ? (
+            <p className="text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto">
+            Last Updated: {lastUpdatedDate}
+            </p>
+        ) : (
+            <p className="text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto">Loading date...</p>
+        )}
       </section>
 
       <Card className="shadow-lg">

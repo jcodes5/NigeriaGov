@@ -1,7 +1,8 @@
+
 "use client"
 
 import { useEffect, useState } from 'react';
-import { getProjectById, ministries, states } from '@/lib/data'; // Assuming you have a getProjectById
+import { getProjectById, ministries, states } from '@/lib/data'; 
 import type { Project, Feedback as FeedbackType } from '@/types';
 import { ImageGallery } from '@/components/projects/image-gallery';
 import { FeedbackForm } from '@/components/projects/feedback-form';
@@ -10,15 +11,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { notFound } from 'next/navigation';
-import { CalendarDays, MapPin, Briefcase, DollarSign, Info, Users, MessageSquare, ThumbsUp, TrendingUp } from 'lucide-react';
+import { CalendarDays, MapPin, Briefcase, DollarSign, Info, Users, MessageSquare, ThumbsUp, TrendingUp, PlayCircle } from 'lucide-react';
 import Link from 'next/link';
+import { VideoCard } from '@/components/common/video-card';
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const [project, setProject] = useState<Project | null | undefined>(undefined); // undefined for loading state
+  const [project, setProject] = useState<Project | null | undefined>(undefined); 
 
-  // Function to refresh feedback for the project
   const refreshFeedback = () => {
-    const updatedProject = getProjectById(params.id); // Re-fetch or update project data
+    const updatedProject = getProjectById(params.id); 
     if (updatedProject) {
       setProject(updatedProject);
     }
@@ -29,7 +30,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     setProject(fetchedProject);
   }, [params.id]);
 
-  if (project === undefined) { // Loading state
+  if (project === undefined) { 
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="animate-pulse space-y-6">
@@ -100,6 +101,19 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
               />
             </CardContent>
           </Card>
+
+          {project.videos && project.videos.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline flex items-center"><PlayCircle className="h-6 w-6 mr-2 text-primary" /> Project Videos</CardTitle>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-4">
+                {project.videos.map((video) => (
+                  <VideoCard key={video.id} video={video} embed={true}/>
+                ))}
+              </CardContent>
+            </Card>
+          )}
           
            {project.tags && project.tags.length > 0 && (
             <Card>
@@ -152,7 +166,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
       <Separator />
 
       {/* Feedback Section */}
-      <section className="space-y-8">
+      <section id="feedback-section" className="space-y-8 scroll-mt-20">
         <h2 className="font-headline text-2xl md:text-3xl font-bold text-foreground flex items-center">
           <MessageSquare className="h-7 w-7 mr-3 text-primary" /> Community Feedback
         </h2>

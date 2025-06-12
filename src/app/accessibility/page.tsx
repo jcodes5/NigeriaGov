@@ -1,7 +1,18 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, HelpCircle, Mail } from "lucide-react";
+
+"use client";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function AccessibilityPage() {
+  const [currentDate, setCurrentDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+  }, []);
+
+
   return (
     <div className="space-y-8 py-8">
       <section className="text-center">
@@ -73,12 +84,9 @@ export default function AccessibilityPage() {
           </ul>
           
           <h2>Date</h2>
-          <p>This statement was created on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.</p>
+          {currentDate ? <p>This statement was created on {currentDate}.</p> : <p>Loading date...</p>}
         </CardContent>
       </Card>
     </div>
   );
 }
-
-// Placeholder icons, replace if not used or add to imports
-import { MapPin, Phone } from "lucide-react";

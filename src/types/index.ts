@@ -1,3 +1,4 @@
+
 export interface Ministry {
   id: string;
   name: string;
@@ -11,10 +12,10 @@ export interface State {
 export interface Feedback {
   id: string;
   projectId: string;
-  userId?: string; // Optional if anonymous feedback is allowed
+  userId?: string; 
   userName: string;
   comment: string;
-  rating?: number; // e.g., 1-5 stars
+  rating?: number; 
   sentimentSummary?: string;
   createdAt: Date;
 }
@@ -22,7 +23,15 @@ export interface Feedback {
 export interface ImpactStat {
   label: string;
   value: string;
-  icon?: React.ElementType; // Lucide icon component
+  icon?: React.ElementType; 
+}
+
+export interface Video {
+  id: string;
+  title: string;
+  url: string; // Should be an embeddable URL (e.g., YouTube embed link)
+  thumbnailUrl?: string;
+  description?: string;
 }
 
 export interface Project {
@@ -35,11 +44,12 @@ export interface Project {
   startDate: Date;
   expectedEndDate?: Date;
   actualEndDate?: Date;
-  description: string; // Rich text / HTML content
+  description: string; 
   images: { url: string; alt: string, dataAiHint?: string }[];
+  videos?: Video[];
   impactStats: ImpactStat[];
-  budget?: number; // Optional
-  expenditure?: number; // Optional
+  budget?: number; 
+  expenditure?: number; 
   tags?: string[];
   lastUpdatedAt: Date;
   feedback?: Feedback[];
@@ -51,4 +61,28 @@ export interface User {
   email: string;
   role: 'user' | 'admin';
   avatarUrl?: string;
+}
+
+export interface NewsArticle {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  imageUrl?: string;
+  dataAiHint?: string;
+  category: string;
+  publishedDate: Date;
+  content: string; // HTML content for the article
+}
+
+export interface ServiceItem {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  icon?: React.ElementType; // Lucide icon component
+  link?: string; // External link or path to an internal page
+  category: string;
+  imageUrl?: string;
+  dataAiHint?: string;
 }
