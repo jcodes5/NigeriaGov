@@ -4,7 +4,7 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, FileText, BarChart3, ShieldAlert, Settings } from "lucide-react";
+import { Users, FileText, BarChart3, ShieldAlert, Settings, Newspaper, Server, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -32,10 +32,12 @@ export default function AdminDashboardPage() {
     );
   }
   
-  const totalProjects = 150;
-  const pendingApprovals = 5;
-  const totalUsers = 1250;
-  const siteHealth = "Good";
+  const totalProjects = 150; // Mock data
+  const pendingApprovals = 5; // Mock data
+  const totalUsers = 1250; // Mock data
+  const siteHealth = "Good"; // Mock data
+  const totalNewsArticles = 25; // Mock data
+  const totalServices = 12; // Mock data
 
   return (
     <div className="space-y-8">
@@ -57,7 +59,7 @@ export default function AdminDashboardPage() {
         </CardHeader>
       </Card>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         <Card className="card-hover shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
@@ -65,21 +67,6 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalProjects}</div>
-            <p className="text-xs text-muted-foreground">
-              Live and archived projects.
-            </p>
-          </CardContent>
-        </Card>
-         <Card className="card-hover shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
-            <FileText className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{pendingApprovals}</div>
-            <p className="text-xs text-muted-foreground">
-              Feedback or content awaiting review.
-            </p>
           </CardContent>
         </Card>
          <Card className="card-hover shadow-md">
@@ -89,9 +76,33 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              Total active and inactive users.
-            </p>
+          </CardContent>
+        </Card>
+        <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">News Articles</CardTitle>
+            <Newspaper className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalNewsArticles}</div>
+          </CardContent>
+        </Card>
+        <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Listed Services</CardTitle>
+            <Server className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalServices}</div>
+          </CardContent>
+        </Card>
+         <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+            <FileText className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{pendingApprovals}</div>
           </CardContent>
         </Card>
         <Card className="card-hover shadow-md">
@@ -101,9 +112,6 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{siteHealth}</div>
-            <p className="text-xs text-muted-foreground">
-              Overall system status.
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -131,6 +139,33 @@ export default function AdminDashboardPage() {
                     </div>
                 </Link>
             </Button>
+             <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/manage-news" className="flex items-start space-x-3">
+                    <Newspaper className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Manage News</p>
+                        <p className="text-xs text-muted-foreground">Create, edit, and publish news articles.</p>
+                    </div>
+                </Link>
+            </Button>
+             <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/manage-services" className="flex items-start space-x-3">
+                    <Server className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Manage Services</p>
+                        <p className="text-xs text-muted-foreground">Add or update government service listings.</p>
+                    </div>
+                </Link>
+            </Button>
+             <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/manage-feedback" className="flex items-start space-x-3">
+                    <MessageSquare className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Manage Feedback</p>
+                        <p className="text-xs text-muted-foreground">Review and moderate user feedback.</p>
+                    </div>
+                </Link>
+            </Button>
             <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
                 <Link href="/dashboard/admin/site-settings" className="flex items-start space-x-3">
                     <Settings className="h-6 w-6 text-primary mt-1"/>
@@ -142,7 +177,6 @@ export default function AdminDashboardPage() {
             </Button>
         </CardContent>
       </Card>
-
     </div>
   );
 }

@@ -12,9 +12,9 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarInset,
-  SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  // SidebarMenuSub,
+  // SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/common/logo";
@@ -31,6 +31,9 @@ import {
   BarChart3,
   ShieldAlert,
   Home,
+  Newspaper, // Added
+  Server, // Added
+  MessageSquare, // Added
 } from "lucide-react";
 import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -63,6 +66,10 @@ const DashboardSidebarContent = () => {
     { href: "/dashboard/admin", label: "Admin Overview", icon: ShieldAlert },
     { href: "/dashboard/admin/manage-users", label: "Manage Users", icon: Users },
     { href: "/dashboard/admin/manage-projects", label: "Manage Projects", icon: BarChart3 },
+    { href: "/dashboard/admin/manage-news", label: "Manage News", icon: Newspaper },
+    { href: "/dashboard/admin/manage-services", label: "Manage Services", icon: Server },
+    { href: "/dashboard/admin/manage-feedback", label: "Manage Feedback", icon: MessageSquare },
+    { href: "/dashboard/admin/site-settings", label: "Site Settings", icon: Settings },
   ];
 
   return (
@@ -96,7 +103,7 @@ const DashboardSidebarContent = () => {
           ))}
           {isAdmin && (
             <>
-              <SidebarMenuSubButton className="font-semibold text-muted-foreground mt-4 mb-1">Admin Tools</SidebarMenuSubButton>
+              <SidebarMenuSubButton className="font-semibold text-muted-foreground mt-4 mb-1 px-2">Admin Tools</SidebarMenuSubButton>
               {adminLinks.map((link) => (
                 <SidebarMenuItem key={link.href}>
                   <Link href={link.href}>
