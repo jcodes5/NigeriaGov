@@ -31,9 +31,10 @@ import {
   BarChart3,
   ShieldAlert,
   Home,
-  Newspaper, // Added
-  Server, // Added
-  MessageSquare, // Added
+  Newspaper, 
+  Server, 
+  MessageSquare, 
+  PlayCircleIcon,
 } from "lucide-react";
 import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -68,6 +69,7 @@ const DashboardSidebarContent = () => {
     { href: "/dashboard/admin/manage-projects", label: "Manage Projects", icon: BarChart3 },
     { href: "/dashboard/admin/manage-news", label: "Manage News", icon: Newspaper },
     { href: "/dashboard/admin/manage-services", label: "Manage Services", icon: Server },
+    { href: "/dashboard/admin/manage-videos", label: "Manage Videos", icon: PlayCircleIcon },
     { href: "/dashboard/admin/manage-feedback", label: "Manage Feedback", icon: MessageSquare },
     { href: "/dashboard/admin/site-settings", label: "Site Settings", icon: Settings },
   ];

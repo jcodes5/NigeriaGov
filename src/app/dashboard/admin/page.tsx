@@ -4,7 +4,7 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, FileText, BarChart3, ShieldAlert, Settings, Newspaper, Server, MessageSquare } from "lucide-react";
+import { Users, FileText, BarChart3, ShieldAlert, Settings, Newspaper, Server, MessageSquare, PlayCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -38,6 +38,7 @@ export default function AdminDashboardPage() {
   const siteHealth = "Good"; // Mock data
   const totalNewsArticles = 25; // Mock data
   const totalServices = 12; // Mock data
+  const totalVideos = 6; // Mock data for videos
 
   return (
     <div className="space-y-8">
@@ -94,6 +95,15 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalServices}</div>
+          </CardContent>
+        </Card>
+        <Card className="card-hover shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Featured Videos</CardTitle>
+            <PlayCircleIcon className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalVideos}</div>
           </CardContent>
         </Card>
          <Card className="card-hover shadow-md">
@@ -154,6 +164,15 @@ export default function AdminDashboardPage() {
                     <div>
                         <p className="font-semibold">Manage Services</p>
                         <p className="text-xs text-muted-foreground">Add or update government service listings.</p>
+                    </div>
+                </Link>
+            </Button>
+            <Button variant="outline" asChild className="button-hover justify-start p-6 text-left h-auto">
+                <Link href="/dashboard/admin/manage-videos" className="flex items-start space-x-3">
+                    <PlayCircleIcon className="h-6 w-6 text-primary mt-1"/>
+                    <div>
+                        <p className="font-semibold">Manage Videos</p>
+                        <p className="text-xs text-muted-foreground">Add, edit, or remove video content.</p>
                     </div>
                 </Link>
             </Button>
