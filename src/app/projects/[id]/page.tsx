@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react'; // Added React.use
 import { getProjectById } from '@/lib/data'; 
 import type { Project } from '@/types';
 import { ImageGallery } from '@/components/projects/image-gallery';
@@ -16,21 +16,23 @@ import Link from 'next/link';
 import { VideoCard } from '@/components/common/video-card';
 import { Button } from '@/components/ui/button';
 
-export default function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params; // Destructure id from params
+export default function ProjectDetailPage({ params: paramsProp }: { params: { id: string } }) {
+  const params = use(paramsProp); // Unwrap params using React.use()
+  const { id } = params; // Destructure id from unwrapped params
+
   const [project, setProject] = useState<Project | null | undefined>(undefined); 
 
   const refreshFeedback = () => {
-    const updatedProject = getProjectById(id); // Use destructured id
+    const updatedProject = getProjectById(id); 
     if (updatedProject) {
       setProject(updatedProject);
     }
   };
   
   useEffect(() => {
-    const fetchedProject = getProjectById(id); // Use destructured id
+    const fetchedProject = getProjectById(id); 
     setProject(fetchedProject);
-  }, [id]); // Use id as dependency
+  }, [id]); 
 
   if (project === undefined) { 
     return (
@@ -191,3 +193,4 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     </div>
   );
 }
+
