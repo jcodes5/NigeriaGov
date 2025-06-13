@@ -9,7 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, LogIn, LogOut, UserPlus, ChevronDown, Newspaper, Briefcase, Heart, Landmark, Scale, Users, Globe, Palette, Bike, MessageSquare
+  LayoutDashboard, LogIn, LogOut, UserPlus, ChevronDown, Newspaper, Briefcase, Heart, Landmark, Scale, Users, Globe, Palette, Bike, MessageSquare, Menu // Added Menu
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -84,12 +84,10 @@ export function Header() {
   const exploreNigeriaItems = [
     { href: "/culture", label: "Culture & History", icon: Palette },
     { href: "/tourism", label: "Travel & Tourism", icon: Globe },
-    { href: "/sports", label: "Sports", icon: Bike }, // Using Bike as placeholder for Sports
+    { href: "/sports", label: "Sports", icon: Bike }, 
   ];
   
   const governmentCitizenshipItems = [
-    // { href: "/ministries", label: "Ministries", icon: Landmark }, // Link to /projects with filter
-    // { href: "/states", label: "States", icon: MapPin }, // Link to /projects with filter
     { href: "/immigration", label: "Immigration & Citizenship", icon: Users },
   ];
 
@@ -165,8 +163,6 @@ const MobileNav = () => {
   ];
   
   const governmentCitizenshipItems = [
-    // { href: "/ministries", label: "Ministries", icon: Landmark },
-    // { href: "/states", label: "States", icon: MapPin },
     { href: "/immigration", label: "Immigration & Citizenship", icon: Users },
   ];
 
@@ -174,7 +170,7 @@ const MobileNav = () => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon">
-          <ChevronDown className="h-5 w-5" />
+          <Menu className="h-5 w-5" /> {/* Changed from ChevronDown to Menu */}
           <span className="sr-only">Toggle menu</span>
         </Button>
       </DropdownMenuTrigger>

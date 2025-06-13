@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Ministry, State } from '@/types';
@@ -8,6 +9,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, FilterX, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import React, { useState } from 'react';
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 
 interface FilterControlsProps {
   ministries: Ministry[];
@@ -110,7 +113,7 @@ export function FilterControls({ ministries, states, onFilterChange, onClearFilt
           </Popover>
         </div>
 
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row sm:space-x-2 gap-2 sm:gap-0">
           <Button onClick={handleApplyFilters} className="w-full button-hover">
             <Search className="mr-2 h-4 w-4" /> Apply
           </Button>
@@ -122,7 +125,3 @@ export function FilterControls({ ministries, states, onFilterChange, onClearFilt
     </Card>
   );
 }
-
-// Need to import Label and Card, assuming they exist in ui
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
