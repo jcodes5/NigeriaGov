@@ -1,5 +1,5 @@
 
-import type { Ministry, State, Project, Feedback, ImpactStat, NewsArticle, ServiceItem, Video } from '@/types';
+import type { Ministry, State, Project, Feedback, ImpactStat, NewsArticle, ServiceItem, Video, User } from '@/types';
 import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle } from 'lucide-react';
 
 export const ministries: Ministry[] = [
@@ -59,7 +59,7 @@ const projectVideos: Video[] = [
 ];
 
 
-export const projects: Project[] = [
+export let projects: Project[] = [
   {
     id: 'p1',
     title: 'Lagos-Ibadan Expressway Rehabilitation',
@@ -194,6 +194,13 @@ export const projects: Project[] = [
     lastUpdatedAt: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 2),
     feedback: [], 
   },
+];
+
+export let mockUsers: User[] = [
+  { id: "user1", name: "Aisha Bello", email: "aisha@example.com", role: "user" },
+  { id: "user2", name: "Chinedu Okafor", email: "chinedu@example.com", role: "user" },
+  { id: "admin1", name: "Admin User", email: "admin@example.com", role: "admin" },
+  { id: "user3", name: "Yemi Adebayo", email: "yemi@example.com", role: "user" },
 ];
 
 export const mockNews: NewsArticle[] = [
@@ -331,4 +338,15 @@ export const getAllServices = (): ServiceItem[] => {
 
 export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
   return mockServices.find(service => service.slug === slug);
+};
+
+// User Management Functions
+export const getUsers = (): User[] => {
+  return mockUsers;
+};
+
+export const deleteUserById = (userId: string): boolean => {
+  const initialLength = mockUsers.length;
+  mockUsers = mockUsers.filter(user => user.id !== userId);
+  return mockUsers.length < initialLength;
 };

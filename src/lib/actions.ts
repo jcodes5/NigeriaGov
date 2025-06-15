@@ -1,8 +1,9 @@
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
 import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from '@/ai/flows/summarize-feedback-sentiment';
-import { addFeedbackToProject, getProjectById } from './data';
+import { addFeedbackToProject, getProjectById, deleteUserById as removeUserFromData } from './data';
 import type { Feedback } from '@/types';
 
 export interface SubmitFeedbackResult {
@@ -54,6 +55,8 @@ export async function submitProjectFeedback(
     // 3. Revalidate path to update UI
     revalidatePath(`/projects/${projectId}`);
     revalidatePath('/projects'); // If projects list page shows feedback counts/summaries
+    revalidatePath('/dashboard/admin/manage-feedback');
+
 
     return {
       success: true,
@@ -69,5 +72,37 @@ export async function submitProjectFeedback(
         errorMessage = error.message;
     }
     return { success: false, message: `Failed to submit feedback: ${errorMessage}` };
+  }
+}
+
+export interface DeleteUserResult {
+  success: boolean;
+  message: string;
+}
+
+export async function deleteUser(userId: string): Promise<DeleteUserResult> {
+  try {
+    // Prevent deleting the main admin user for demo purposes
+    if (userId === "admin1") {
+      return { success: false, message: "Cannot delete the primary admin account." };
+    }
+
+    const deleted = removeUserFromData(userId);
+
+    if (deleted) {
+      revalidatePath("/dashboard/admin/manage-users");
+      // Potentially revalidate other paths if user data is displayed elsewhere
+      // e.g., revalidatePath("/users"); if there's a public user list
+      return { success: true, message: "User deleted successfully." };
+    } else {
+      return { success: false, message: "User not found or could not be deleted." };
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    let errorMessage = 'An unexpected error occurred while deleting the user.';
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+    return { success: false, message: errorMessage };
   }
 }
