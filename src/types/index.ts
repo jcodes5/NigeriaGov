@@ -1,5 +1,7 @@
 
 // Removed: import type { Database } from "./supabase"; // No longer primary source for DB types with Prisma
+import type { NewsArticle as PrismaNewsArticle } from '@prisma/client';
+
 
 export interface Ministry {
   id: string;
@@ -46,20 +48,20 @@ export interface Project {
   id: string;
   title: string;
   subtitle: string;
-  ministry: Ministry; // Resolved from ministry_id using mock data for now
-  state: State;     // Resolved from state_id using mock data for now
+  ministry: Ministry; 
+  state: State;     
   status: 'Ongoing' | 'Completed' | 'Planned' | 'On Hold';
-  startDate: Date; // Prisma returns Date objects
-  expectedEndDate?: Date | null; // Prisma returns Date objects or null
-  actualEndDate?: Date | null;   // Prisma returns Date objects or null
+  startDate: Date; 
+  expectedEndDate?: Date | null; 
+  actualEndDate?: Date | null;   
   description: string;
-  images: { url: string; alt: string, dataAiHint?: string }[]; // JSONB from Prisma
-  videos?: Video[]; // JSONB from Prisma
-  impactStats: ImpactStat[]; // JSONB from Prisma (with iconName)
+  images: { url: string; alt: string, dataAiHint?: string }[]; 
+  videos?: Video[]; 
+  impactStats: ImpactStat[]; 
   budget?: number | null;
   expenditure?: number | null;
   tags?: string[];
-  lastUpdatedAt: Date; // Prisma returns Date objects
+  lastUpdatedAt: Date; 
   feedback?: Feedback[];
   ministry_id?: string | null;
   state_id?: string | null;
@@ -75,17 +77,21 @@ export interface User {
   created_at?: string | null; // ISO date string or null
 }
 
+// Updated to align with Prisma's Date object for publishedDate
 export interface NewsArticle {
   id: string;
   slug: string;
   title: string;
   summary: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageUrl?: string | null; // Prisma might return null
+  dataAiHint?: string | null; // Prisma might return null
   category: string;
-  publishedDate: Date | string; // Can be Date object from Prisma or string
+  publishedDate: Date; // Prisma returns Date objects
   content: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
+
 
 export interface ServiceItem {
   id: string;

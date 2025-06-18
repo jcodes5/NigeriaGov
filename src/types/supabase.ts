@@ -47,21 +47,21 @@ export interface Database {
           id: string // UUID
           title: string
           subtitle: string
-          ministry_id: string | null // We'll look this up in mock data for now
-          state_id: string | null    // We'll look this up in mock data for now
-          status: string // 'Ongoing' | 'Completed' | 'Planned' | 'On Hold'
-          start_date: string // ISO date string
-          expected_end_date: string | null // ISO date string
-          actual_end_date: string | null // ISO date string
+          ministry_id: string | null 
+          state_id: string | null    
+          status: string 
+          start_date: string 
+          expected_end_date: string | null 
+          actual_end_date: string | null 
           description: string
-          images: Json | null // Array of { url: string; alt: string; dataAiHint?: string }
-          videos: Json | null // Array of Video type
-          impact_stats: Json | null // Array of ImpactStat type (with iconName)
+          images: Json | null 
+          videos: Json | null 
+          impact_stats: Json | null 
           budget: number | null
           expenditure: number | null
-          tags: string[] | null // Array of text
-          last_updated_at: string // ISO date string
-          created_at: string // ISO date string
+          tags: string[] | null 
+          last_updated_at: string 
+          created_at: string 
         }
         Insert: {
           id?: string
@@ -107,14 +107,14 @@ export interface Database {
       }
       feedback: {
         Row: {
-          id: string // UUID
-          project_id: string // FK to projects.id
-          user_id: string | null // FK to users.id (optional for now)
+          id: string 
+          project_id: string 
+          user_id: string | null 
           user_name: string
           comment: string
           rating: number | null
           sentiment_summary: string | null
-          created_at: string // ISO date string
+          created_at: string 
         }
         Insert: {
           id?: string
@@ -144,12 +144,54 @@ export interface Database {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "feedback_user_id_fkey" // Assuming you have a users table
+            foreignKeyName: "feedback_user_id_fkey" 
             columns: ["user_id"]
             referencedRelation: "users"
             referencedColumns: ["id"]
           }
         ]
+      }
+      news_articles: { // Added NewsArticle table definition
+        Row: {
+          id: string
+          slug: string
+          title: string
+          summary: string
+          image_url: string | null
+          data_ai_hint: string | null
+          category: string
+          published_date: string // timestamptz
+          content: string
+          created_at: string // timestamptz
+          updated_at: string // timestamptz
+        }
+        Insert: {
+          id?: string
+          slug: string
+          title: string
+          summary: string
+          image_url?: string | null
+          data_ai_hint?: string | null
+          category: string
+          published_date: string
+          content: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          title?: string
+          summary?: string
+          image_url?: string | null
+          data_ai_hint?: string | null
+          category?: string
+          published_date?: string
+          content?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

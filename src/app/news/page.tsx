@@ -1,13 +1,13 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
 import { getAllNewsArticles } from "@/lib/data";
 import { NewsCard } from "@/components/news/news-card";
-import { Button } from "@/components/ui/button";
 import { Newspaper } from "lucide-react";
+import type { NewsArticle } from "@/types";
 
-export default function NewsPage() {
-  const allNews = getAllNewsArticles();
+// This page is a Server Component, so we can fetch data directly
+export default async function NewsPage() {
+  const allNews: NewsArticle[] = await getAllNewsArticles();
 
   return (
     <div className="space-y-8 py-8">

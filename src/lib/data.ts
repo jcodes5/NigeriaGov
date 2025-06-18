@@ -1,8 +1,8 @@
 
-import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle, ServiceItem } from '@/types';
+import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem } from '@/types';
 import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle, PersonStanding, Construction, CheckCircle, Zap } from 'lucide-react';
 import prisma from './prisma';
-import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser } from '@prisma/client';
+import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle } from '@prisma/client';
 
 // --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
@@ -65,8 +65,8 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
     videos: (prismaProject.videos as unknown as Video[] || []),
     impactStats: mappedImpactStats,
-    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined, // Ensure budget is number
-    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined, // Ensure expenditure is number
+    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined, 
+    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined, 
     tags: prismaProject.tags || [],
     lastUpdatedAt: new Date(prismaProject.last_updated_at),
     feedback: prismaProject.feedback_list?.map(mapPrismaFeedbackToAppFeedback) || [],
@@ -101,6 +101,23 @@ const mapPrismaUserToAppUser = (prismaUser: PrismaUser): AppUser => {
   };
 };
 
+// --- Helper function to map Prisma NewsArticle to AppNewsArticle ---
+const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle => {
+  return {
+    id: prismaNews.id,
+    slug: prismaNews.slug,
+    title: prismaNews.title,
+    summary: prismaNews.summary,
+    imageUrl: prismaNews.imageUrl,
+    dataAiHint: prismaNews.dataAiHint,
+    category: prismaNews.category,
+    publishedDate: new Date(prismaNews.publishedDate), // Prisma returns Date
+    content: prismaNews.content,
+    createdAt: new Date(prismaNews.createdAt),
+    updatedAt: new Date(prismaNews.updatedAt),
+  };
+};
+
 
 // --- Project Data Functions (Prisma Integrated) ---
 export const getProjectById = async (id: string): Promise<AppProject | null> => {
@@ -108,7 +125,7 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     const projectWithFeedback = await prisma.project.findUnique({
       where: { id },
       include: {
-        feedback_list: { // Matches the relation field name in Prisma schema
+        feedback_list: { 
           orderBy: { created_at: 'desc' },
         },
       },
@@ -118,7 +135,7 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     return mapPrismaProjectToAppProject(projectWithFeedback);
   } catch (error) {
     console.error('Error fetching project by ID with Prisma:', error);
-    return null; // Or throw error to be handled by caller
+    return null; 
   }
 };
 
@@ -126,7 +143,7 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
   try {
     const prismaProjects = await prisma.project.findMany({
       orderBy: {
-        last_updated_at: 'desc', // Example: order by last updated
+        last_updated_at: 'desc', 
       },
     });
     return prismaProjects.map(mapPrismaProjectToAppProject);
@@ -164,7 +181,7 @@ export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedba
   try {
     const feedbackWithProjects = await prisma.feedback.findMany({
       include: {
-        project: { // This 'project' must match the relation field name in your Prisma schema for Feedback
+        project: { 
           select: { title: true },
         },
       },
@@ -197,7 +214,6 @@ export async function getUsers(): Promise<AppUser[]> {
 
 export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
   try {
-    // Ensure related feedback user_id is handled (e.g., set to null or use onDelete: SetNull in Prisma schema)
      await prisma.feedback.updateMany({
       where: { user_id: userId },
       data: { user_id: null },
@@ -218,14 +234,12 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
       where: { id: userData.id },
     });
     if (existingUser) {
-      // Update if exists, e.g. if name or avatar changed during a re-sync scenario
       const updatedUser = await prisma.user.update({
         where: { id: userData.id },
         data: {
           name: userData.name,
-          email: userData.email, // Email might not change often here, but good to keep sync
+          email: userData.email, 
           avatar_url: userData.avatar_url,
-          // role is typically managed separately, not on every sync
         },
       });
       return mapPrismaUserToAppUser(updatedUser);
@@ -259,67 +273,35 @@ export async function getUserProfileFromDb(userId: string): Promise<AppUser | nu
   }
 }
 
-// --- Mock Data (to be phased out) ---
-export const MOCK_PROJECTS_TEMP: AppProject[] = [
-  // {
-  //   id: 'proj1',
-  //   title: 'Lagos-Ibadan Expressway Reconstruction',
-  //   subtitle: 'Expansion and rehabilitation of a critical transport corridor.',
-  //   ministry: ministries[0],
-  //   state: states[0],
-  //   status: 'Ongoing',
-  //   startDate: new Date('2018-07-01'),
-  //   expectedEndDate: new Date('2024-12-31'),
-  //   description: '<p>The Lagos-Ibadan Expressway project involves the full reconstruction and expansion of the 127.6-kilometer road, a vital link between Nigeria\'s economic hub, Lagos, and other parts of the country. The project aims to reduce travel time, improve safety, and facilitate economic activities.</p><h3>Key Features:</h3><ul><li>Expansion from two to three lanes in each direction for a significant portion.</li><li>Reconstruction of existing pavement and construction of new interchanges.</li><li>Installation of road furniture, street lighting, and safety barriers.</li></ul>',
-  //   images: [{ url: 'https://placehold.co/800x600.png', alt: 'Lagos-Ibadan Expressway under construction', dataAiHint: 'road construction' }, { url: 'https://placehold.co/800x600.png', alt: 'Completed section of Lagos-Ibadan Expressway', dataAiHint: 'highway asphalt' }],
-  //   videos: [ {id: 'vid1', title: 'Project Update Q1 2024', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'construction site', description: 'Latest progress on the Lagos-Ibadan Expressway.'} ],
-  //   impactStats: [
-  //     { label: 'Kilometers Reconstructed', value: '95km / 127.6km', iconName: 'Road' },
-  //     { label: 'Jobs Created (Direct)', value: '5,000+', iconName: 'Users' },
-  //     { label: 'Travel Time Reduction (Projected)', value: '40%', iconName: 'Clock' },
-  //   ],
-  //   budget: 167000000000, // ~167 Billion Naira
-  //   expenditure: 120000000000,
-  //   tags: ['infrastructure', 'transportation', 'road construction', 'economic development'],
-  //   lastUpdatedAt: new Date('2024-04-15'),
-  //   feedback: [
-  //     { id: 'fb1', projectId: 'proj1', userName: 'Adekunle Gold', comment: 'Great progress, but need more traffic management during construction.', rating: 4, sentimentSummary: "Positive with concerns", createdAt: new Date('2024-03-10').toISOString() },
-  //   ]
-  // },
-  // {
-  //   id: 'proj2',
-  //   title: 'Second Niger Bridge',
-  //   subtitle: 'A new bridge connecting Asaba and Onitsha over the River Niger.',
-  //   ministry: ministries[0],
-  //   state: states[2], // Assuming Rivers for Onitsha side, could be Anambra
-  //   status: 'Completed',
-  //   startDate: new Date('2018-09-01'),
-  //   actualEndDate: new Date('2023-05-15'),
-  //   description: '<p>The Second Niger Bridge is a key national infrastructure project, designed to ease traffic congestion on the existing Niger Bridge and enhance connectivity between Southeastern Nigeria and the rest of the country. It is a 1.6 km long bridge with approach roads.</p>',
-  //   images: [{ url: 'https://placehold.co/800x600.png', alt: 'Second Niger Bridge aerial view', dataAiHint: 'bridge river' }],
-  //   impactStats: [ { label: 'Bridge Length', value: '1.6 km', iconName: 'TrendingUp' } ],
-  //   budget: 336000000000, // ~336 Billion Naira
-  //   tags: ['infrastructure', 'bridge', 'transportation', 'connectivity'],
-  //   lastUpdatedAt: new Date('2023-06-01'),
-  // },
-];
+// --- News Data Functions (Prisma Integrated) ---
+export const getNewsArticleBySlug = async (slug: string): Promise<AppNewsArticle | null> => {
+  try {
+    const newsArticle = await prisma.newsArticle.findUnique({
+      where: { slug },
+    });
+    return newsArticle ? mapPrismaNewsToAppNews(newsArticle) : null;
+  } catch (error) {
+    console.error(`Error fetching news article by slug "${slug}" with Prisma:`, error);
+    return null;
+  }
+};
+
+export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
+  try {
+    const newsArticles = await prisma.newsArticle.findMany({
+      orderBy: {
+        publishedDate: 'desc',
+      },
+    });
+    return newsArticles.map(mapPrismaNewsToAppNews);
+  } catch (error) {
+    console.error('Error fetching all news articles with Prisma:', error);
+    return [];
+  }
+};
 
 
-export const mockNews: NewsArticle[] = [
-  {
-    id: 'news1',
-    slug: 'government-launches-new-portal-for-project-transparency',
-    title: 'Government Launches New Portal for Project Transparency',
-    summary: 'A new online platform, NigeriaGovHub, has been launched to provide citizens with transparent access to government projects and initiatives.',
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'government building',
-    category: 'Governance',
-    publishedDate: new Date('2024-05-15T10:00:00Z'),
-    content: '<p>The Federal Government today unveiled NigeriaGovHub, a landmark initiative aimed at enhancing transparency and accountability in public project execution. The portal offers detailed information on projects nationwide, including budgets, timelines, and implementing agencies. Citizens can track progress, provide feedback, and engage directly with governance processes. This platform marks a significant step towards open government and citizen participation.</p>',
-  },
-  // Add more news articles if needed
-];
-
+// --- Services (Still using mock data, to be migrated to Prisma) ---
 export const mockServices: ServiceItem[] = [
   {
     id: 'service1',
@@ -337,32 +319,13 @@ export const mockServices: ServiceItem[] = [
     slug: 'file-taxes-online',
     title: 'File Taxes Online (e-FIRS)',
     summary: 'Use the Federal Inland Revenue Service portal to file your tax returns.',
-    icon: Briefcase, // Placeholder, consider 'Scale' or similar for taxes
+    icon: Briefcase, 
     category: 'Taxation',
     link: '#', // Placeholder
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'tax document',
   },
-  // Add more services if needed
 ];
-
-export const mockFeaturedVideos: Video[] = [
-  { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
-  { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
-  { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
-];
-
-
-// --- News & Services (Still using mock data, to be migrated to Prisma) ---
-export const getNewsArticleBySlug = (slug: string): NewsArticle | undefined => {
-  console.warn("getNewsArticleBySlug is using mock data.");
-  return mockNews.find(article => article.slug === slug);
-};
-
-export const getAllNewsArticles = (): NewsArticle[] => {
-  console.warn("getAllNewsArticles is using mock data.");
-  return mockNews.sort((a,b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
-};
 
 export const getAllServices = (): ServiceItem[] => {
   console.warn("getAllServices is using mock data.");
@@ -375,4 +338,11 @@ export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
 };
 
 // --- Mock Data (to be phased out as features are migrated) ---
+export const MOCK_PROJECTS_TEMP: AppProject[] = []; // No longer primary source for projects
+export const mockNews: AppNewsArticle[] = []; // No longer primary source for news
+export const mockFeaturedVideos: Video[] = [
+  { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
+  { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
+  { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
+];
 export const projects: AppProject[] = MOCK_PROJECTS_TEMP; // Temporary alias for compatibility during migration

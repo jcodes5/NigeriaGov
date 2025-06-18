@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import type { NewsArticle } from '@/types';
 
-export default function NewsArticlePage({ params }: { params: { slug: string } }) {
-  const article = getNewsArticleBySlug(params.slug);
+// This page remains a Server Component
+export default async function NewsArticlePage({ params }: { params: { slug: string } }) {
+  const article: NewsArticle | null = await getNewsArticleBySlug(params.slug);
 
   if (!article) {
     notFound();
@@ -57,9 +59,10 @@ export default function NewsArticlePage({ params }: { params: { slug: string } }
   );
 }
 
-// Optional: Generate static paths if you have a fixed set of news articles
+// Optional: For full static site generation, you could generate params.
+// For dynamic fetching (SSR or ISR with revalidation), this is not strictly needed.
 // export async function generateStaticParams() {
-//   const news = getAllNewsArticles();
+//   const news = await getAllNewsArticles(); // Ensure this is async
 //   return news.map((article) => ({
 //     slug: article.slug,
 //   }));

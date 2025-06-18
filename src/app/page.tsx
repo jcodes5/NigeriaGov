@@ -4,21 +4,21 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowRight, CheckCircle, Eye, Newspaper, Server, PlayCircle, Briefcase } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { mockNews, mockServices, getAllProjects, mockFeaturedVideos } from "@/lib/data";
+import { getAllNewsArticles, mockServices, getAllProjects, mockFeaturedVideos } from "@/lib/data";
 import { NewsCard } from "@/components/news/news-card";
 import { ServiceCard } from "@/components/services/service-card";
 import { VideoCard } from "@/components/common/video-card";
+import type { Project, NewsArticle } from "@/types";
 
-// mockNews, mockServices, and mockFeaturedVideos are still using mock data
-const latestNews = mockNews.slice(0, 3);
-const popularServices = mockServices.slice(0, 3);
 
+const popularServices = mockServices.slice(0, 3); // Services still mock for now
 
 export default async function Home() {
-  // Fetch projects asynchronously
-  const allProjects = await getAllProjects();
-  // Take first 3 projects for featured section
+  const allProjects: Project[] = await getAllProjects();
   const featuredProjects = allProjects.slice(0, 3);
+
+  const allNews: NewsArticle[] = await getAllNewsArticles();
+  const latestNews = allNews.slice(0, 3);
 
   return (
     <div className="space-y-16">
@@ -75,97 +75,105 @@ export default async function Home() {
       </section>
 
       {/* Featured Projects Section */}
-      <section className="py-16 bg-muted/30 rounded-lg">
-        <div className="container mx-auto px-4">
-          <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
-            <Briefcase className="h-8 w-8 mr-3 text-primary" /> Featured Initiatives
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {featuredProjects.map((project) => (
-              <Card key={project.id} className="overflow-hidden card-hover shadow-md">
-                <CardHeader className="p-0">
-                  <Image
-                    src={project.images[0]?.url || 'https://placehold.co/600x400.png'}
-                    alt={project.images[0]?.alt || project.title}
-                    data-ai-hint={project.images[0]?.dataAiHint || "project image"}
-                    width={600}
-                    height={400}
-                    className="w-full h-48 object-cover"
-                  />
-                </CardHeader>
-                <CardContent className="p-6">
-                  <CardTitle className="font-headline text-xl mb-2 text-primary">{project.title}</CardTitle>
-                  <CardDescription className="text-sm text-foreground/70 mb-4">
-                    Ministry: {project.ministry.name}
-                  </CardDescription>
-                </CardContent>
-                <CardFooter>
-                  <Button variant="secondary" asChild className="w-full button-hover">
-                    <Link href={`/projects/${project.id}`}>View Details <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
+      {featuredProjects.length > 0 && (
+        <section className="py-16 bg-muted/30 rounded-lg">
+          <div className="container mx-auto px-4">
+            <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
+              <Briefcase className="h-8 w-8 mr-3 text-primary" /> Featured Initiatives
+            </h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {featuredProjects.map((project) => (
+                <Card key={project.id} className="overflow-hidden card-hover shadow-md">
+                  <CardHeader className="p-0">
+                    <Image
+                      src={project.images[0]?.url || 'https://placehold.co/600x400.png'}
+                      alt={project.images[0]?.alt || project.title}
+                      data-ai-hint={project.images[0]?.dataAiHint || "project image"}
+                      width={600}
+                      height={400}
+                      className="w-full h-48 object-cover"
+                    />
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <CardTitle className="font-headline text-xl mb-2 text-primary">{project.title}</CardTitle>
+                    <CardDescription className="text-sm text-foreground/70 mb-4">
+                      Ministry: {project.ministry.name}
+                    </CardDescription>
+                  </CardContent>
+                  <CardFooter>
+                    <Button variant="secondary" asChild className="w-full button-hover">
+                      <Link href={`/projects/${project.id}`}>View Details <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+            <div className="text-center mt-12">
+              <Button size="lg" variant="outline" asChild className="button-hover">
+                <Link href="/projects">View All Projects</Link>
+              </Button>
+            </div>
           </div>
-          <div className="text-center mt-12">
-            <Button size="lg" variant="outline" asChild className="button-hover">
-              <Link href="/projects">View All Projects</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Latest News Section */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
-            <Newspaper className="h-8 w-8 mr-3 text-primary" /> Latest News & Updates
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {latestNews.map((article) => (
-              <NewsCard key={article.id} article={article} />
-            ))}
+      {latestNews.length > 0 && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
+              <Newspaper className="h-8 w-8 mr-3 text-primary" /> Latest News & Updates
+            </h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {latestNews.map((article) => (
+                <NewsCard key={article.id} article={article} />
+              ))}
+            </div>
+            <div className="text-center mt-12">
+              <Button size="lg" variant="outline" asChild className="button-hover">
+                <Link href="/news">View All News</Link>
+              </Button>
+            </div>
           </div>
-          <div className="text-center mt-12">
-            <Button size="lg" variant="outline" asChild className="button-hover">
-              <Link href="/news">View All News</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Featured Services Section */}
-      <section className="py-16 bg-muted/30 rounded-lg">
-        <div className="container mx-auto px-4">
-          <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
-            <Server className="h-8 w-8 mr-3 text-primary" /> Popular Government Services
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {popularServices.map((service) => (
-              <ServiceCard key={service.id} service={service} />
-            ))}
+      {popularServices.length > 0 && (
+        <section className="py-16 bg-muted/30 rounded-lg">
+          <div className="container mx-auto px-4">
+            <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
+              <Server className="h-8 w-8 mr-3 text-primary" /> Popular Government Services
+            </h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {popularServices.map((service) => (
+                <ServiceCard key={service.id} service={service} />
+              ))}
+            </div>
+            <div className="text-center mt-12">
+              <Button size="lg" variant="outline" asChild className="button-hover">
+                <Link href="/services">Explore All Services</Link>
+              </Button>
+            </div>
           </div>
-          <div className="text-center mt-12">
-            <Button size="lg" variant="outline" asChild className="button-hover">
-              <Link href="/services">Explore All Services</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Featured Videos Section */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
-            <PlayCircle className="h-8 w-8 mr-3 text-primary" /> Featured Videos
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockFeaturedVideos.map((video) => (
-              <VideoCard key={video.id} video={video} embed={true} />
-            ))}
+      {mockFeaturedVideos.length > 0 && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
+              <PlayCircle className="h-8 w-8 mr-3 text-primary" /> Featured Videos
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {mockFeaturedVideos.map((video) => (
+                <VideoCard key={video.id} video={video} embed={true} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
     </div>
   );

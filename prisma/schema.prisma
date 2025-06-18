@@ -1,63 +1,77 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id          String     @id @default(uuid())
-  created_at  DateTime?  @default(now()) @map("created_at")
-  name        String?
-  email       String?    @unique
-  role        String? // Consider using an Enum: enum Role { USER ADMIN }
-  avatar_url  String?    @map("avatar_url")
-  feedback    Feedback[]
+generator client {
+  provider = "prisma-client-js"
+}
 
-  @@map("users")
+model User {
+  id         String     @id @unique // Matches Supabase auth.users.id
+  name       String?
+  email      String?    @unique
+  role       String? // 'user' or 'admin'
+  avatar_url String?
+  created_at DateTime?  @default(now())
+  updated_at DateTime?  @updatedAt
+  feedback   Feedback[] // Relation to Feedback model
+
+  @@map("users") // Explicitly map to the 'users' table
 }
 
 model Project {
-  id                 String     @id @default(uuid())
-  title              String
-  subtitle           String
-  ministry_id        String?    @map("ministry_id") // Will be text for now, referencing mock data IDs
-  state_id           String?    @map("state_id")    // Will be text for now, referencing mock data IDs
-  status             String     // e.g., 'Ongoing', 'Completed', 'Planned', 'On Hold'
-  start_date         DateTime   @map("start_date")
-  expected_end_date  DateTime?  @map("expected_end_date")
-  actual_end_date    DateTime?  @map("actual_end_date")
-  description        String
-  images             Json?      // Expected: { url: string; alt: string; dataAiHint?: string }[]
-  videos             Json?      // Expected: { id: string; title: string; url: string; thumbnailUrl?: string; description?: string; dataAiHint?: string }[]
-  impact_stats       Json?      @map("impact_stats") // Expected: { label: string; value: string; iconName?: string }[]
-  budget             Float?
-  expenditure        Float?
-  tags               String[]   @default([])
-  last_updated_at    DateTime   @updatedAt @map("last_updated_at")
-  created_at         DateTime   @default(now()) @map("created_at")
-  feedback_list      Feedback[] @relation("ProjectFeedback")
+  id                  String     @id @default(uuid())
+  title               String
+  subtitle            String
+  ministry_id         String?
+  state_id            String?
+  status              String // 'Ongoing', 'Completed', 'Planned', 'On Hold'
+  start_date          DateTime
+  expected_end_date   DateTime?
+  actual_end_date     DateTime?
+  description         String     @db.Text
+  images              Json? // Array of { url: string; alt: string; dataAiHint?: string }
+  videos              Json? // Array of Video type
+  impact_stats        Json? // Array of ImpactStat type (with iconName)
+  budget              Decimal?
+  expenditure         Decimal?
+  tags                String[] // Array of text
+  last_updated_at     DateTime   @default(now())
+  created_at          DateTime   @default(now())
+  feedback_list       Feedback[] @relation("ProjectFeedback") // Explicit relation name
 
-  @@map("projects")
+  @@map("projects") // Explicitly map to the 'projects' table
 }
 
 model Feedback {
-  id                 String    @id @default(uuid())
-  project_id         String    @map("project_id")
-  user_id            String?   @map("user_id")
-  user_name          String    @map("user_name")
-  comment            String
-  rating             Int?
-  sentiment_summary  String?   @map("sentiment_summary")
-  created_at         DateTime  @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  project_id        String
+  user_id           String?
+  user_name         String
+  comment           String   @db.Text
+  rating            Int?
+  sentiment_summary String?
+  created_at        DateTime @default(now())
 
-  project Project? @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
-  user    User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  project Project @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
-  @@map("feedback")
+  @@map("feedback") // Explicitly map to the 'feedback' table
+}
+
+model NewsArticle {
+  id            String    @id @default(uuid())
+  slug          String    @unique
+  title         String
+  summary       String    @db.Text
+  imageUrl      String?   @map("image_url")
+  dataAiHint    String?   @map("data_ai_hint")
+  category      String
+  publishedDate DateTime  @map("published_date")
+  content       String    @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("news_articles")
 }
