@@ -29,12 +29,11 @@ export const states: State[] = [
 
 // --- Helper function to map Prisma Project to AppProject ---
 const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_list?: PrismaFeedback[] }): AppProject => {
-  const ministry = ministries.find(m => m.id === prismaProject.ministry_id) || { id: prismaProject.ministry_id || 'unknown_ministry', name: 'Unknown Ministry' };
-  const state = states.find(s => s.id === prismaProject.state_id) || { id: prismaProject.state_id || 'unknown_state', name: 'Unknown State' };
+  const ministry = ministries.find(m => m.id === prismaProject.ministry_id) || { id: prismaProject.ministry_id || 'unknown_ministry', name: prismaProject.ministry_id || 'Unknown Ministry' };
+  const state = states.find(s => s.id === prismaProject.state_id) || { id: prismaProject.state_id || 'unknown_state', name: prismaProject.state_id || 'Unknown State' };
 
   const mappedImpactStats = (prismaProject.impact_stats as unknown as ImpactStat[] || []).map(stat => {
     let iconComponent;
-    // Simplified mapping for brevity, ensure all icons are covered
     switch (stat.iconName) {
       case 'Briefcase': iconComponent = Briefcase; break;
       case 'Users': iconComponent = Users; break;
@@ -59,17 +58,17 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     ministry,
     state,
     status: prismaProject.status as AppProject['status'],
-    startDate: new Date(prismaProject.start_date), // Ensure Date object
+    startDate: new Date(prismaProject.start_date),
     expectedEndDate: prismaProject.expected_end_date ? new Date(prismaProject.expected_end_date) : undefined,
     actualEndDate: prismaProject.actual_end_date ? new Date(prismaProject.actual_end_date) : undefined,
     description: prismaProject.description,
     images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
     videos: (prismaProject.videos as unknown as Video[] || []),
     impactStats: mappedImpactStats,
-    budget: prismaProject.budget || undefined,
-    expenditure: prismaProject.expenditure || undefined,
+    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined, // Ensure budget is number
+    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined, // Ensure expenditure is number
     tags: prismaProject.tags || [],
-    lastUpdatedAt: new Date(prismaProject.last_updated_at), // Ensure Date object
+    lastUpdatedAt: new Date(prismaProject.last_updated_at),
     feedback: prismaProject.feedback_list?.map(mapPrismaFeedbackToAppFeedback) || [],
     ministry_id: prismaProject.ministry_id,
     state_id: prismaProject.state_id,
@@ -103,13 +102,13 @@ const mapPrismaUserToAppUser = (prismaUser: PrismaUser): AppUser => {
 };
 
 
-// --- Project Data Functions (Prisma Integrated for getProjectById) ---
+// --- Project Data Functions (Prisma Integrated) ---
 export const getProjectById = async (id: string): Promise<AppProject | null> => {
   try {
     const projectWithFeedback = await prisma.project.findUnique({
       where: { id },
       include: {
-        feedback_list: {
+        feedback_list: { // Matches the relation field name in Prisma schema
           orderBy: { created_at: 'desc' },
         },
       },
@@ -119,24 +118,22 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     return mapPrismaProjectToAppProject(projectWithFeedback);
   } catch (error) {
     console.error('Error fetching project by ID with Prisma:', error);
-    return null;
+    return null; // Or throw error to be handled by caller
   }
 };
 
-export const getAllProjects = (filters?: { ministryId?: string; stateId?: string; status?: string; startDate?: Date }): AppProject[] => {
-  // TODO: Migrate this to Prisma with actual filtering.
-  console.warn("getAllProjects is still using mock data for listing. Needs Prisma migration for filtering.");
-  let filteredProjects = MOCK_PROJECTS_TEMP;
-  if (filters?.ministryId) {
-    filteredProjects = filteredProjects.filter(p => p.ministry.id === filters.ministryId);
+export const getAllProjects = async (): Promise<AppProject[]> => {
+  try {
+    const prismaProjects = await prisma.project.findMany({
+      orderBy: {
+        last_updated_at: 'desc', // Example: order by last updated
+      },
+    });
+    return prismaProjects.map(mapPrismaProjectToAppProject);
+  } catch (error) {
+    console.error('Error fetching all projects with Prisma:', error);
+    return [];
   }
-  if (filters?.stateId) {
-    filteredProjects = filteredProjects.filter(p => p.state.id === filters.stateId);
-  }
-   if (filters?.status) {
-    filteredProjects = filteredProjects.filter(p => p.status === filters.status);
-  }
-  return filteredProjects;
 };
 
 
@@ -167,7 +164,7 @@ export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedba
   try {
     const feedbackWithProjects = await prisma.feedback.findMany({
       include: {
-        project: {
+        project: { // This 'project' must match the relation field name in your Prisma schema for Feedback
           select: { title: true },
         },
       },
@@ -200,28 +197,38 @@ export async function getUsers(): Promise<AppUser[]> {
 
 export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
   try {
-    // Before deleting a user, ensure related feedback user_id is handled (e.g., set to null) if there's a foreign key constraint.
-    // For simplicity, this example assumes cascading null or no strict FK enforcement on feedback.user_id from the DB side for now.
+    // Ensure related feedback user_id is handled (e.g., set to null or use onDelete: SetNull in Prisma schema)
+     await prisma.feedback.updateMany({
+      where: { user_id: userId },
+      data: { user_id: null },
+    });
     await prisma.user.delete({
       where: { id: userId },
     });
     return { success: true };
   } catch (error) {
     console.error('Error deleting user with Prisma:', error);
-    // Check for specific Prisma error codes if needed, e.g., P2025 for record not found
     return { success: false, error };
   }
 }
 
-// New function to create a user profile in our public 'users' table
 export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_at' | 'updated_at' | 'avatar_url'> & { avatar_url?: string | null }): Promise<AppUser | null> {
   try {
     const existingUser = await prisma.user.findUnique({
       where: { id: userData.id },
     });
     if (existingUser) {
-      // Optionally update if exists, or just return existing. For now, return existing.
-      return mapPrismaUserToAppUser(existingUser);
+      // Update if exists, e.g. if name or avatar changed during a re-sync scenario
+      const updatedUser = await prisma.user.update({
+        where: { id: userData.id },
+        data: {
+          name: userData.name,
+          email: userData.email, // Email might not change often here, but good to keep sync
+          avatar_url: userData.avatar_url,
+          // role is typically managed separately, not on every sync
+        },
+      });
+      return mapPrismaUserToAppUser(updatedUser);
     }
 
     const newUser = await prisma.user.create({
@@ -229,18 +236,17 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
         id: userData.id,
         name: userData.name,
         email: userData.email,
-        role: userData.role || 'user', // Default to 'user'
+        role: userData.role || 'user',
         avatar_url: userData.avatar_url,
       },
     });
     return mapPrismaUserToAppUser(newUser);
   } catch (error) {
-    console.error('Error creating user profile in DB with Prisma:', error);
-    throw error; // Re-throw to be caught by server action
+    console.error('Error creating/updating user profile in DB with Prisma:', error);
+    throw error;
   }
 }
 
-// New function to get a user profile by ID from our public 'users' table
 export async function getUserProfileFromDb(userId: string): Promise<AppUser | null> {
   try {
     const user = await prisma.user.findUnique({
@@ -254,14 +260,48 @@ export async function getUserProfileFromDb(userId: string): Promise<AppUser | nu
 }
 
 // --- Mock Data (to be phased out) ---
-const generateMockFeedback = (projectId: string, count: number): AppFeedback[] => {
-  const feedbackList: AppFeedback[] = [];
-  // ... (mock feedback generation remains for projects still using mock data) ...
-  return feedbackList;
-};
-
-const MOCK_PROJECTS_TEMP: AppProject[] = [
-  // ... (mock project data remains for projects still using mock data) ...
+export const MOCK_PROJECTS_TEMP: AppProject[] = [
+  // {
+  //   id: 'proj1',
+  //   title: 'Lagos-Ibadan Expressway Reconstruction',
+  //   subtitle: 'Expansion and rehabilitation of a critical transport corridor.',
+  //   ministry: ministries[0],
+  //   state: states[0],
+  //   status: 'Ongoing',
+  //   startDate: new Date('2018-07-01'),
+  //   expectedEndDate: new Date('2024-12-31'),
+  //   description: '<p>The Lagos-Ibadan Expressway project involves the full reconstruction and expansion of the 127.6-kilometer road, a vital link between Nigeria\'s economic hub, Lagos, and other parts of the country. The project aims to reduce travel time, improve safety, and facilitate economic activities.</p><h3>Key Features:</h3><ul><li>Expansion from two to three lanes in each direction for a significant portion.</li><li>Reconstruction of existing pavement and construction of new interchanges.</li><li>Installation of road furniture, street lighting, and safety barriers.</li></ul>',
+  //   images: [{ url: 'https://placehold.co/800x600.png', alt: 'Lagos-Ibadan Expressway under construction', dataAiHint: 'road construction' }, { url: 'https://placehold.co/800x600.png', alt: 'Completed section of Lagos-Ibadan Expressway', dataAiHint: 'highway asphalt' }],
+  //   videos: [ {id: 'vid1', title: 'Project Update Q1 2024', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'construction site', description: 'Latest progress on the Lagos-Ibadan Expressway.'} ],
+  //   impactStats: [
+  //     { label: 'Kilometers Reconstructed', value: '95km / 127.6km', iconName: 'Road' },
+  //     { label: 'Jobs Created (Direct)', value: '5,000+', iconName: 'Users' },
+  //     { label: 'Travel Time Reduction (Projected)', value: '40%', iconName: 'Clock' },
+  //   ],
+  //   budget: 167000000000, // ~167 Billion Naira
+  //   expenditure: 120000000000,
+  //   tags: ['infrastructure', 'transportation', 'road construction', 'economic development'],
+  //   lastUpdatedAt: new Date('2024-04-15'),
+  //   feedback: [
+  //     { id: 'fb1', projectId: 'proj1', userName: 'Adekunle Gold', comment: 'Great progress, but need more traffic management during construction.', rating: 4, sentimentSummary: "Positive with concerns", createdAt: new Date('2024-03-10').toISOString() },
+  //   ]
+  // },
+  // {
+  //   id: 'proj2',
+  //   title: 'Second Niger Bridge',
+  //   subtitle: 'A new bridge connecting Asaba and Onitsha over the River Niger.',
+  //   ministry: ministries[0],
+  //   state: states[2], // Assuming Rivers for Onitsha side, could be Anambra
+  //   status: 'Completed',
+  //   startDate: new Date('2018-09-01'),
+  //   actualEndDate: new Date('2023-05-15'),
+  //   description: '<p>The Second Niger Bridge is a key national infrastructure project, designed to ease traffic congestion on the existing Niger Bridge and enhance connectivity between Southeastern Nigeria and the rest of the country. It is a 1.6 km long bridge with approach roads.</p>',
+  //   images: [{ url: 'https://placehold.co/800x600.png', alt: 'Second Niger Bridge aerial view', dataAiHint: 'bridge river' }],
+  //   impactStats: [ { label: 'Bridge Length', value: '1.6 km', iconName: 'TrendingUp' } ],
+  //   budget: 336000000000, // ~336 Billion Naira
+  //   tags: ['infrastructure', 'bridge', 'transportation', 'connectivity'],
+  //   lastUpdatedAt: new Date('2023-06-01'),
+  // },
 ];
 
 
@@ -277,6 +317,7 @@ export const mockNews: NewsArticle[] = [
     publishedDate: new Date('2024-05-15T10:00:00Z'),
     content: '<p>The Federal Government today unveiled NigeriaGovHub, a landmark initiative aimed at enhancing transparency and accountability in public project execution. The portal offers detailed information on projects nationwide, including budgets, timelines, and implementing agencies. Citizens can track progress, provide feedback, and engage directly with governance processes. This platform marks a significant step towards open government and citizen participation.</p>',
   },
+  // Add more news articles if needed
 ];
 
 export const mockServices: ServiceItem[] = [
@@ -291,11 +332,24 @@ export const mockServices: ServiceItem[] = [
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'passport document',
   },
+  {
+    id: 'service2',
+    slug: 'file-taxes-online',
+    title: 'File Taxes Online (e-FIRS)',
+    summary: 'Use the Federal Inland Revenue Service portal to file your tax returns.',
+    icon: Briefcase, // Placeholder, consider 'Scale' or similar for taxes
+    category: 'Taxation',
+    link: '#', // Placeholder
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'tax document',
+  },
+  // Add more services if needed
 ];
 
 export const mockFeaturedVideos: Video[] = [
   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
-  // ... other mock videos
+  { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
+  { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
 ];
 
 
@@ -319,3 +373,6 @@ export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
   console.warn("getServiceBySlug is using mock data.");
   return mockServices.find(service => service.slug === slug);
 };
+
+// --- Mock Data (to be phased out as features are migrated) ---
+export const projects: AppProject[] = MOCK_PROJECTS_TEMP; // Temporary alias for compatibility during migration

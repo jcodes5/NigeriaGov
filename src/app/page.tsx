@@ -9,13 +9,17 @@ import { NewsCard } from "@/components/news/news-card";
 import { ServiceCard } from "@/components/services/service-card";
 import { VideoCard } from "@/components/common/video-card";
 
-// Take first 3 projects for featured section
-const featuredProjects = getAllProjects().slice(0, 3);
+// mockNews, mockServices, and mockFeaturedVideos are still using mock data
 const latestNews = mockNews.slice(0, 3);
 const popularServices = mockServices.slice(0, 3);
 
 
-export default function Home() {
+export default async function Home() {
+  // Fetch projects asynchronously
+  const allProjects = await getAllProjects();
+  // Take first 3 projects for featured section
+  const featuredProjects = allProjects.slice(0, 3);
+
   return (
     <div className="space-y-16">
       {/* Hero Section */}
