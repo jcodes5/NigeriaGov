@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from '@/ai/flows/summarize-feedback-sentiment';
-import { addFeedbackToProject, getProjectById, deleteUserById as removeUserFromData } from './data';
+import { addFeedbackToProject, getProjectById, deleteUserById as removeUserFromSupabase } from './data';
 import type { Feedback } from '@/types';
 
 export interface SubmitFeedbackResult {
@@ -18,13 +18,14 @@ export async function submitProjectFeedback(
   formData: { userName: string; comment: string; rating?: number }
 ): Promise<SubmitFeedbackResult> {
   try {
-    // 1. Save feedback (mock saving for now)
+    // 1. Save feedback (mock saving for now, will be Supabase call)
     const newFeedbackData: Omit<Feedback, 'id' | 'createdAt' | 'projectId'> = {
       userName: formData.userName,
       comment: formData.comment,
       rating: formData.rating,
     };
     
+    // TODO: Replace with Supabase insert for feedback
     const savedFeedback = addFeedbackToProject(projectId, newFeedbackData);
 
     if (!savedFeedback) {
@@ -37,13 +38,10 @@ export async function submitProjectFeedback(
     };
     const sentimentOutput = await summarizeFeedbackSentiment(sentimentInput);
     
-    // Attach sentiment summary to the feedback object (if your data model supports it)
-    // For this example, we'll assume it's stored, or just return it.
-    // In a real app, you'd update the stored feedback with this summary.
     savedFeedback.sentimentSummary = sentimentOutput.sentimentSummary;
 
-    // Simulate updating the project's feedback list with the new sentiment summary
-    const project = getProjectById(projectId);
+    // TODO: Update the feedback record in Supabase with sentimentSummary
+    const project = getProjectById(projectId); // This will also need to become async if projects are from Supabase
     if (project && project.feedback) {
         const feedbackIndex = project.feedback.findIndex(f => f.id === savedFeedback.id);
         if (feedbackIndex !== -1) {
@@ -51,12 +49,9 @@ export async function submitProjectFeedback(
         }
     }
 
-
-    // 3. Revalidate path to update UI
     revalidatePath(`/projects/${projectId}`);
-    revalidatePath('/projects'); // If projects list page shows feedback counts/summaries
+    revalidatePath('/projects');
     revalidatePath('/dashboard/admin/manage-feedback');
-
 
     return {
       success: true,
@@ -82,23 +77,23 @@ export interface DeleteUserResult {
 
 export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   try {
-    // Prevent deleting the main admin user for demo purposes
-    if (userId === "admin1") {
-      return { success: false, message: "Cannot delete the primary admin account." };
+    // Prevent deleting the main admin user for demo purposes if still using mock auth ID "admin1"
+    // This check might need adjustment if Supabase auth is fully integrated
+    if (userId === "admin1") { 
+      return { success: false, message: "Cannot delete the primary admin account (mock)." };
     }
 
-    const deleted = removeUserFromData(userId);
+    const { success, error } = await removeUserFromSupabase(userId);
 
-    if (deleted) {
+    if (success) {
       revalidatePath("/dashboard/admin/manage-users");
-      // Potentially revalidate other paths if user data is displayed elsewhere
-      // e.g., revalidatePath("/users"); if there's a public user list
       return { success: true, message: "User deleted successfully." };
     } else {
-      return { success: false, message: "User not found or could not be deleted." };
+      console.error("Supabase delete error:", error);
+      return { success: false, message: `Failed to delete user: ${error?.message || 'Unknown error'}` };
     }
   } catch (error) {
-    console.error('Error deleting user:', error);
+    console.error('Error in deleteUser server action:', error);
     let errorMessage = 'An unexpected error occurred while deleting the user.';
     if (error instanceof Error) {
         errorMessage = error.message;

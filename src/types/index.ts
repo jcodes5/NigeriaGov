@@ -17,7 +17,7 @@ export interface Feedback {
   comment: string;
   rating?: number; 
   sentimentSummary?: string;
-  createdAt: Date;
+  createdAt: Date | string; // Adjusted to allow string for Supabase dates
 }
 
 export interface ImpactStat {
@@ -29,38 +29,41 @@ export interface ImpactStat {
 export interface Video {
   id: string;
   title: string;
-  url: string; // Should be an embeddable URL (e.g., YouTube embed link)
+  url: string; 
   thumbnailUrl?: string;
   description?: string;
+  dataAiHint?: string;
 }
 
 export interface Project {
   id: string;
   title: string;
   subtitle: string;
-  ministry: Ministry;
-  state: State;
+  ministry: Ministry; // This might need to be ministry_id: string and fetched separately or joined
+  state: State;     // This might need to be state_id: string and fetched separately or joined
   status: 'Ongoing' | 'Completed' | 'Planned' | 'On Hold';
-  startDate: Date;
-  expectedEndDate?: Date;
-  actualEndDate?: Date;
+  startDate: Date | string;
+  expectedEndDate?: Date | string;
+  actualEndDate?: Date | string;
   description: string; 
-  images: { url: string; alt: string, dataAiHint?: string }[];
-  videos?: Video[];
-  impactStats: ImpactStat[];
+  images: { url: string; alt: string, dataAiHint?: string }[]; // JSONB or separate table
+  videos?: Video[]; // JSONB or separate table
+  impactStats: ImpactStat[]; // JSONB
   budget?: number; 
   expenditure?: number; 
-  tags?: string[];
-  lastUpdatedAt: Date;
-  feedback?: Feedback[];
+  tags?: string[]; // array of text
+  lastUpdatedAt: Date | string;
+  feedback?: Feedback[]; // Likely a separate table related by project_id
 }
 
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'user' | 'admin';
-  avatarUrl?: string;
+  id: string; // Typically UUID from Supabase
+  name: string | null;
+  email: string | null;
+  role: 'user' | 'admin' | null;
+  avatarUrl?: string | null;
+  // Supabase might add other fields like created_at, updated_at
+  created_at?: string; 
 }
 
 export interface NewsArticle {
@@ -71,8 +74,8 @@ export interface NewsArticle {
   imageUrl?: string;
   dataAiHint?: string;
   category: string;
-  publishedDate: Date;
-  content: string; // HTML content for the article
+  publishedDate: Date | string;
+  content: string; 
 }
 
 export interface ServiceItem {
@@ -80,8 +83,9 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  icon?: React.ElementType; // Lucide icon component
-  link?: string; // External link or path to an internal page
+  iconName?: string; // Store icon name, resolve to component on client
+  icon?: React.ElementType; // For client-side rendering
+  link?: string; 
   category: string;
   imageUrl?: string;
   dataAiHint?: string;

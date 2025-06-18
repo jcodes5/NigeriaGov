@@ -1,6 +1,7 @@
 
 import type { Ministry, State, Project, Feedback, ImpactStat, NewsArticle, ServiceItem, Video, User } from '@/types';
 import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 export const ministries: Ministry[] = [
   { id: 'm1', name: 'Federal Ministry of Works and Housing' },
@@ -54,8 +55,8 @@ const defaultImpactStats: ImpactStat[] = [
 ];
 
 const projectVideos: Video[] = [
-  { id: 'vid1', title: 'Project Overview Video', url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', thumbnailUrl: 'https://placehold.co/600x338.png', description: 'An overview of the project goals and impact.'},
-  { id: 'vid2', title: 'Community Impact Story', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/600x338.png', description: 'Hear from those directly benefiting from this initiative.'},
+  { id: 'vid1', title: 'Project Overview Video', url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', thumbnailUrl: 'https://placehold.co/600x338.png', dataAiHint:'video overview', description: 'An overview of the project goals and impact.'},
+  { id: 'vid2', title: 'Community Impact Story', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/600x338.png', dataAiHint:'community impact', description: 'Hear from those directly benefiting from this initiative.'},
 ];
 
 
@@ -196,11 +197,12 @@ export let projects: Project[] = [
   },
 ];
 
+// User data for mock authentication. Will be replaced by Supabase Auth later.
 export let mockUsers: User[] = [
-  { id: "user1", name: "Aisha Bello", email: "aisha@example.com", role: "user" },
-  { id: "user2", name: "Chinedu Okafor", email: "chinedu@example.com", role: "user" },
-  { id: "admin1", name: "Admin User", email: "admin@example.com", role: "admin" },
-  { id: "user3", name: "Yemi Adebayo", email: "yemi@example.com", role: "user" },
+  { id: "user1", name: "Aisha Bello", email: "aisha@example.com", role: "user", created_at: new Date().toISOString() },
+  { id: "user2", name: "Chinedu Okafor", email: "chinedu@example.com", role: "user", created_at: new Date().toISOString() },
+  { id: "admin1", name: "Admin User", email: "admin@example.com", role: "admin", created_at: new Date().toISOString() },
+  { id: "user3", name: "Yemi Adebayo", email: "yemi@example.com", role: "user", created_at: new Date().toISOString() },
 ];
 
 export const mockNews: NewsArticle[] = [
@@ -287,11 +289,13 @@ export const mockFeaturedVideos: Video[] = [
 
 // Function to get a single project by ID
 export const getProjectById = (id: string): Project | undefined => {
+  // This will be replaced with Supabase call
   return projects.find(p => p.id === id);
 };
 
 // Function to get all projects, with optional filtering
 export const getAllProjects = (filters?: { ministryId?: string; stateId?: string; status?: string; startDate?: Date }): Project[] => {
+  // This will be replaced with Supabase call
   let filteredProjects = projects;
   if (filters?.ministryId) {
     filteredProjects = filteredProjects.filter(p => p.ministry.id === filters.ministryId);
@@ -307,6 +311,7 @@ export const getAllProjects = (filters?: { ministryId?: string; stateId?: string
 };
 
 export const addFeedbackToProject = (projectId: string, feedback: Omit<Feedback, 'id' | 'createdAt' | 'projectId'>): Feedback | null => {
+  // This will be replaced with Supabase call
   const project = getProjectById(projectId);
   if (!project) return null;
 
@@ -325,28 +330,42 @@ export const addFeedbackToProject = (projectId: string, feedback: Omit<Feedback,
 };
 
 export const getNewsArticleBySlug = (slug: string): NewsArticle | undefined => {
+  // This will be replaced with Supabase call
   return mockNews.find(article => article.slug === slug);
 };
 
 export const getAllNewsArticles = (): NewsArticle[] => {
-  return mockNews.sort((a,b) => b.publishedDate.getTime() - a.publishedDate.getTime());
+  // This will be replaced with Supabase call
+  return mockNews.sort((a,b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
 };
 
 export const getAllServices = (): ServiceItem[] => {
+  // This will be replaced with Supabase call
   return mockServices;
 };
 
 export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
+  // This will be replaced with Supabase call
   return mockServices.find(service => service.slug === slug);
 };
 
-// User Management Functions
-export const getUsers = (): User[] => {
-  return mockUsers;
-};
+// User Management Functions (Supabase Integration)
+export async function getUsers(): Promise<User[]> {
+  const { data, error } = await supabase.from('users').select('*');
+  if (error) {
+    console.error('Error fetching users:', error);
+    // Consider how to handle this error in the UI. Throwing here might be too disruptive.
+    // Return an empty array or a custom error object/status.
+    return []; 
+  }
+  return data || [];
+}
 
-export const deleteUserById = (userId: string): boolean => {
-  const initialLength = mockUsers.length;
-  mockUsers = mockUsers.filter(user => user.id !== userId);
-  return mockUsers.length < initialLength;
-};
+export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
+  const { error } = await supabase.from('users').delete().eq('id', userId);
+  if (error) {
+    console.error('Error deleting user from Supabase:', error);
+    return { success: false, error };
+  }
+  return { success: true };
+}
