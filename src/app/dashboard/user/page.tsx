@@ -9,15 +9,25 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function UserDashboardPage() {
-  const { user } = useAuth();
+  const { profile, isLoading } = useAuth(); // Use profile from AuthContext
 
-  if (!user) {
-    return <p>Please log in to view your dashboard.</p>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-3 text-lg">Loading dashboard data...</p>
+      </div>
+    );
   }
 
-  const recentFeedbackCount = 5;
-  const bookmarkedProjectsCount = 3;
-  const averageRatingGiven = 4.2;
+  if (!profile) {
+     // This could happen if profile fetching failed or user has no profile in public.users
+    return <p>Could not load user profile. Please try logging out and back in, or contact support.</p>;
+  }
+
+  const recentFeedbackCount = 5; // Mock data, replace with actual count later
+  const bookmarkedProjectsCount = 3; // Mock data
+  const averageRatingGiven = 4.2; // Mock data
 
 
   return (
@@ -26,14 +36,14 @@ export default function UserDashboardPage() {
         <CardHeader>
           <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:space-x-4 space-y-2 sm:space-y-0">
             <Image 
-                src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=13714C&color=fff&font-size=0.5`} 
-                alt={user.name} 
+                src={profile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=13714C&color=fff&font-size=0.5`} 
+                alt={profile.name || 'User'} 
                 width={80} 
                 height={80} 
                 className="rounded-full border-2 border-primary shrink-0"
             />
             <div>
-                <CardTitle className="font-headline text-3xl text-primary">Welcome, {user.name}!</CardTitle>
+                <CardTitle className="font-headline text-3xl text-primary">Welcome, {profile.name || 'User'}!</CardTitle>
                 <CardDescription className="text-md text-foreground/80">Here&apos;s an overview of your activity on NigeriaGovHub.</CardDescription>
             </div>
           </div>

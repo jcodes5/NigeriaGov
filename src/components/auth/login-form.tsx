@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm, type SubmitHandler } from 'react-hook-form';
@@ -7,14 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import { useAuth } from '@/context/auth-context';
 import { useState } from 'react';
-import type { User } from '@/types';
+import { supabase } from '@/lib/supabaseClient';
+import Link from 'next/link';
+
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  password: z.string().min(1, { message: "Password is required." }), // Supabase allows various password lengths
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -22,38 +25,37 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export function LoginForm() {
   const { toast } = useToast();
   const router = useRouter();
-  const { login } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams(); // To get redirect URL
+  const { isLoading: authContextLoading } = useAuth(); // Use context's loading state
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit: SubmitHandler<LoginFormData> = async (data) => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSubmittingForm(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    });
 
-    // Mock authentication logic
-    if (data.email === "user@example.com" && data.password === "password") {
-      const userData: User = { id: "user1", name: "John Doe", email: data.email, role: "user" };
-      login(userData);
-      toast({ title: "Login Successful", description: "Welcome back!" });
-      router.push('/dashboard/user');
-    } else if (data.email === "admin@example.com" && data.password === "password") {
-      const adminData: User = { id: "admin1", name: "Admin User", email: data.email, role: "admin" };
-      login(adminData);
-      toast({ title: "Admin Login Successful", description: "Welcome, Admin!" });
-      router.push('/dashboard/admin');
-    } else {
+    if (error) {
       toast({
         title: "Login Failed",
-        description: "Invalid email or password.",
+        description: error.message || "Invalid email or password.",
         variant: "destructive",
       });
+    } else {
+      toast({ title: "Login Successful", description: "Welcome back!" });
+      const redirectUrl = searchParams.get('redirect') || '/dashboard/user';
+      router.push(redirectUrl);
+      router.refresh(); // Important to refresh server components and ensure context updates
     }
-    setIsLoading(false);
+    setIsSubmittingForm(false);
   };
+  
+  const overallLoading = authContextLoading || isSubmittingForm;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -71,7 +73,14 @@ export function LoginForm() {
       </div>
 
       <div>
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Button variant="link" asChild className="p-0 text-xs font-medium text-primary hover:text-primary/80">
+            <Link href="/forgot-password">
+              Forgot password?
+            </Link>
+          </Button>
+        </div>
         <Input
           id="password"
           type="password"
@@ -83,14 +92,8 @@ export function LoginForm() {
         {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
       </div>
       
-      {/* <div className="flex items-center justify-between">
-        <div className="text-sm">
-          <Button variant="link" className="p-0 font-medium text-primary hover:text-primary/80">Forgot your password?</Button>
-        </div>
-      </div> */}
-
-      <Button type="submit" className="w-full button-hover" disabled={isLoading}>
-        {isLoading ? 'Logging in...' : 'Log In'}
+      <Button type="submit" className="w-full button-hover" disabled={overallLoading}>
+        {overallLoading ? 'Processing...' : 'Log In'}
       </Button>
     </form>
   );

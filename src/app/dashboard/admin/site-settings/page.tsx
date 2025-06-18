@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useEffect, useState } from "react";
+import { useEffect } from "react"; // Removed useState as it's not used for settings state
 import { useRouter } from "next/navigation";
 
 const settingsSchema = z.object({
@@ -24,6 +24,7 @@ const settingsSchema = z.object({
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
+// Mock current settings - in a real app, these would be fetched from a DB or config
 const currentSettings: SettingsFormData = {
   siteName: "NigeriaGovHub",
   maintenanceMode: false,
@@ -33,7 +34,7 @@ const currentSettings: SettingsFormData = {
 
 
 export default function SiteSettingsPage() {
-  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const { isAdmin, isLoading: authLoading } = useAuth(); // Use profile from AuthContext
   const router = useRouter();
   const { toast } = useToast();
   
@@ -48,23 +49,28 @@ export default function SiteSettingsPage() {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
-        // reset(fetchedSettings); // If fetching real settings
+        // If fetching real settings, you would do:
+        // const fetchedSettings = await getSiteSettings(); // (imaginary function)
+        // reset(fetchedSettings); 
+        reset(currentSettings); // For now, reset with mock data
       }
     }
-  }, [user, isAdmin, authLoading, router, toast, reset]);
+  }, [isAdmin, authLoading, router, toast, reset]);
 
 
   const onSubmit: SubmitHandler<SettingsFormData> = async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Settings saved:", data);
-    Object.assign(currentSettings, data); 
+    // In a real app, save settings to DB via a server action
+    // await saveSiteSettings(data);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    console.log("Settings saved (simulated):", data);
+    Object.assign(currentSettings, data); // Update mock currentSettings in memory
     toast({
-      title: "Settings Saved",
+      title: "Settings Saved (Simulated)",
       description: "Site settings have been successfully updated.",
     });
   };
   
-  if (authLoading || !isAdmin) {
+  if (authLoading || !isAdmin) { // Covers initial loading and access denial after loading
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -135,7 +141,7 @@ export default function SiteSettingsPage() {
                 Reset to Defaults
             </Button>
             <Button type="submit" className="button-hover w-full sm:w-auto" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Settings"}
+                {isSubmitting ? "Saving..." : "Save Settings (Simulated)"}
             </Button>
         </div>
       </form>

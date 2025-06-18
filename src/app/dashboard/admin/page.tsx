@@ -12,18 +12,18 @@ import Image from "next/image";
 import { useToast } from "@/hooks/use-toast"; 
 
 export default function AdminDashboardPage() {
-  const { user, isAdmin, isLoading } = useAuth();
+  const { profile, isAdmin, isLoading } = useAuth(); // Using profile from AuthContext
   const router = useRouter();
   const { toast } = useToast(); 
 
   useEffect(() => {
-    if (!isLoading && !isAdmin) {
+    if (!isLoading && !isAdmin) { // Check isAdmin after loading is complete
       toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
       router.replace("/dashboard/user"); 
     }
-  }, [user, isAdmin, isLoading, router, toast]); 
+  }, [profile, isAdmin, isLoading, router, toast]); // Add profile to dependency array
 
-  if (isLoading || !isAdmin) { 
+  if (isLoading || !isAdmin) { // Show loader if still loading or if not admin (even if profile is loaded)
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -32,6 +32,11 @@ export default function AdminDashboardPage() {
     );
   }
   
+  // At this point, isLoading is false and isAdmin is true, so profile should exist
+  const adminName = profile?.name || 'Admin';
+  const adminAvatarName = profile?.name || profile?.email?.split('@')[0] || 'Admin';
+
+
   const totalProjects = 150; // Mock data
   const pendingApprovals = 5; // Mock data
   const totalUsers = 1250; // Mock data
@@ -46,8 +51,8 @@ export default function AdminDashboardPage() {
         <CardHeader>
            <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:space-x-4 space-y-2 sm:space-y-0">
             <Image 
-                src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Admin')}&background=13714C&color=fff&font-size=0.5`} 
-                alt={user?.name || 'Admin'} 
+                src={profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminAvatarName)}&background=13714C&color=fff&font-size=0.5`} 
+                alt={adminName} 
                 width={80} 
                 height={80} 
                 className="rounded-full border-2 border-primary shrink-0"

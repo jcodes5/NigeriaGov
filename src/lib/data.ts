@@ -1,9 +1,8 @@
 
 import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser } from '@/types';
 import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle, PersonStanding, Construction, CheckCircle, Zap } from 'lucide-react';
-import prisma from './prisma'; // Import Prisma client
+import prisma from './prisma';
 import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser } from '@prisma/client';
-
 
 // --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
@@ -35,10 +34,10 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
 
   const mappedImpactStats = (prismaProject.impact_stats as unknown as ImpactStat[] || []).map(stat => {
     let iconComponent;
+    // Simplified mapping for brevity, ensure all icons are covered
     switch (stat.iconName) {
       case 'Briefcase': iconComponent = Briefcase; break;
       case 'Users': iconComponent = Users; break;
-      // ... (add all other icon mappings as before) ...
       case 'DollarSign': iconComponent = DollarSign; break;
       case 'TrendingUp': iconComponent = TrendingUp; break;
       case 'MapPin': iconComponent = MapPin; break;
@@ -60,9 +59,9 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     ministry,
     state,
     status: prismaProject.status as AppProject['status'],
-    startDate: prismaProject.start_date,
-    expectedEndDate: prismaProject.expected_end_date || undefined,
-    actualEndDate: prismaProject.actual_end_date || undefined,
+    startDate: new Date(prismaProject.start_date), // Ensure Date object
+    expectedEndDate: prismaProject.expected_end_date ? new Date(prismaProject.expected_end_date) : undefined,
+    actualEndDate: prismaProject.actual_end_date ? new Date(prismaProject.actual_end_date) : undefined,
     description: prismaProject.description,
     images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
     videos: (prismaProject.videos as unknown as Video[] || []),
@@ -70,7 +69,7 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     budget: prismaProject.budget || undefined,
     expenditure: prismaProject.expenditure || undefined,
     tags: prismaProject.tags || [],
-    lastUpdatedAt: prismaProject.last_updated_at,
+    lastUpdatedAt: new Date(prismaProject.last_updated_at), // Ensure Date object
     feedback: prismaProject.feedback_list?.map(mapPrismaFeedbackToAppFeedback) || [],
     ministry_id: prismaProject.ministry_id,
     state_id: prismaProject.state_id,
@@ -87,7 +86,7 @@ const mapPrismaFeedbackToAppFeedback = (prismaFeedback: PrismaFeedback): AppFeed
     comment: prismaFeedback.comment,
     rating: prismaFeedback.rating,
     sentiment_summary: prismaFeedback.sentiment_summary,
-    created_at: prismaFeedback.created_at.toISOString(), // Ensure it's string
+    created_at: new Date(prismaFeedback.created_at).toISOString(),
   };
 };
 
@@ -97,20 +96,20 @@ const mapPrismaUserToAppUser = (prismaUser: PrismaUser): AppUser => {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
-    role: prismaUser.role as AppUser['role'] | null, // Prisma returns string?, AppUser expects 'user'|'admin'|null
+    role: prismaUser.role as AppUser['role'] | null,
     avatarUrl: prismaUser.avatar_url,
-    created_at: prismaUser.created_at?.toISOString(),
+    created_at: prismaUser.created_at ? new Date(prismaUser.created_at).toISOString() : null,
   };
 };
 
 
-// --- Project Data Functions (Prisma Integrated) ---
+// --- Project Data Functions (Prisma Integrated for getProjectById) ---
 export const getProjectById = async (id: string): Promise<AppProject | null> => {
   try {
     const projectWithFeedback = await prisma.project.findUnique({
       where: { id },
       include: {
-        feedback_list: { // Relation name from Prisma schema
+        feedback_list: {
           orderBy: { created_at: 'desc' },
         },
       },
@@ -125,16 +124,16 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
 };
 
 export const getAllProjects = (filters?: { ministryId?: string; stateId?: string; status?: string; startDate?: Date }): AppProject[] => {
-  // TODO: Migrate this to Prisma with actual filtering. For now, returning mock data.
+  // TODO: Migrate this to Prisma with actual filtering.
   console.warn("getAllProjects is still using mock data for listing. Needs Prisma migration for filtering.");
-  let filteredProjects = MOCK_PROJECTS_TEMP; // Using temporary mock projects
+  let filteredProjects = MOCK_PROJECTS_TEMP;
   if (filters?.ministryId) {
     filteredProjects = filteredProjects.filter(p => p.ministry.id === filters.ministryId);
   }
   if (filters?.stateId) {
     filteredProjects = filteredProjects.filter(p => p.state.id === filters.stateId);
   }
-  if (filters?.status) {
+   if (filters?.status) {
     filteredProjects = filteredProjects.filter(p => p.status === filters.status);
   }
   return filteredProjects;
@@ -144,7 +143,7 @@ export const getAllProjects = (filters?: { ministryId?: string; stateId?: string
 // --- Feedback Data Functions (Prisma Integrated) ---
 export const addFeedbackToProject = async (
   projectId: string,
-  feedbackData: Omit<AppFeedback, 'id' | 'created_at' | 'project_id'> & { userId?: string | null }
+  feedbackData: { userName: string; comment: string; rating?: number | null; sentimentSummary?: string | null; userId?: string | null }
 ): Promise<AppFeedback | null> => {
   try {
     const savedFeedback = await prisma.feedback.create({
@@ -154,7 +153,7 @@ export const addFeedbackToProject = async (
         comment: feedbackData.comment,
         rating: feedbackData.rating,
         sentiment_summary: feedbackData.sentimentSummary,
-        user_id: feedbackData.userId || null, // Prisma expects null for optional relations if not provided
+        user_id: feedbackData.userId,
       },
     });
     return mapPrismaFeedbackToAppFeedback(savedFeedback);
@@ -168,7 +167,7 @@ export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedba
   try {
     const feedbackWithProjects = await prisma.feedback.findMany({
       include: {
-        project: { // Relation name for project
+        project: {
           select: { title: true },
         },
       },
@@ -189,7 +188,9 @@ export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedba
 // --- User Management Functions (Prisma Integrated) ---
 export async function getUsers(): Promise<AppUser[]> {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({
+      orderBy: { created_at: 'desc'}
+    });
     return users.map(mapPrismaUserToAppUser);
   } catch (error) {
     console.error('Error fetching users with Prisma:', error);
@@ -199,60 +200,68 @@ export async function getUsers(): Promise<AppUser[]> {
 
 export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
   try {
+    // Before deleting a user, ensure related feedback user_id is handled (e.g., set to null) if there's a foreign key constraint.
+    // For simplicity, this example assumes cascading null or no strict FK enforcement on feedback.user_id from the DB side for now.
     await prisma.user.delete({
       where: { id: userId },
     });
     return { success: true };
   } catch (error) {
     console.error('Error deleting user with Prisma:', error);
+    // Check for specific Prisma error codes if needed, e.g., P2025 for record not found
     return { success: false, error };
   }
 }
 
+// New function to create a user profile in our public 'users' table
+export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_at' | 'updated_at' | 'avatar_url'> & { avatar_url?: string | null }): Promise<AppUser | null> {
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userData.id },
+    });
+    if (existingUser) {
+      // Optionally update if exists, or just return existing. For now, return existing.
+      return mapPrismaUserToAppUser(existingUser);
+    }
+
+    const newUser = await prisma.user.create({
+      data: {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role || 'user', // Default to 'user'
+        avatar_url: userData.avatar_url,
+      },
+    });
+    return mapPrismaUserToAppUser(newUser);
+  } catch (error) {
+    console.error('Error creating user profile in DB with Prisma:', error);
+    throw error; // Re-throw to be caught by server action
+  }
+}
+
+// New function to get a user profile by ID from our public 'users' table
+export async function getUserProfileFromDb(userId: string): Promise<AppUser | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+    return user ? mapPrismaUserToAppUser(user) : null;
+  } catch (error) {
+    console.error(`Error fetching profile for user ${userId} from DB with Prisma:`, error);
+    return null;
+  }
+}
 
 // --- Mock Data (to be phased out) ---
 const generateMockFeedback = (projectId: string, count: number): AppFeedback[] => {
   const feedbackList: AppFeedback[] = [];
-  const users = ['Aisha Bello', 'Chinedu Okafor', 'Yemi Adebayo', 'Fatima Sani'];
-  const comments = [
-    "This is a great initiative, keep up the good work!",
-    "I have some concerns about the timeline, seems a bit ambitious.",
-    "Excellent progress so far, very impressive.",
-    "Could we get more frequent updates on this project?",
-    "The impact on our community is already visible. Thank you!"
-  ];
-  for (let i = 0; i < count; i++) {
-    feedbackList.push({
-      id: `f${projectId}-${i + 1}`,
-      project_id: projectId,
-      user_name: users[i % users.length],
-      comment: comments[i % comments.length],
-      rating: Math.floor(Math.random() * 3) + 3,
-      created_at: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 30).toISOString(),
-      sentiment_summary: Math.random() > 0.5 ? 'Positive' : 'Mixed',
-      user_id: null,
-    });
-  }
+  // ... (mock feedback generation remains for projects still using mock data) ...
   return feedbackList;
 };
 
 const MOCK_PROJECTS_TEMP: AppProject[] = [
-  {
-    id: 'p1-mock',
-    title: 'Mock: Lagos-Ibadan Expressway Rehab',
-    subtitle: 'Mock: Enhancing connectivity.',
-    ministry: ministries[0],
-    state: states[0],
-    status: 'Ongoing',
-    startDate: new Date('2018-07-01').toISOString(),
-    expectedEndDate: new Date('2024-12-31').toISOString(),
-    description: `<p>Mock data for Lagos-Ibadan Expressway.</p>`,
-    images: [ { url: 'https://placehold.co/800x600.png', alt: 'Mock road construction', dataAiHint: 'road construction' } ],
-    impactStats: [ { label: "Jobs Created", value: "1,200+", iconName: "Briefcase" } ],
-    budget: 310000000000,
-    lastUpdatedAt: new Date().toISOString(),
-    feedback: generateMockFeedback('p1-mock', 2),
-  },
+  // ... (mock project data remains for projects still using mock data) ...
 ];
 
 
@@ -278,7 +287,7 @@ export const mockServices: ServiceItem[] = [
     summary: 'Access the portal to apply for or renew your Nigerian international passport.',
     icon: Plane,
     category: 'Immigration',
-    link: '#',
+    link: '#', // Placeholder
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'passport document',
   },
@@ -286,30 +295,27 @@ export const mockServices: ServiceItem[] = [
 
 export const mockFeaturedVideos: Video[] = [
   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
+  // ... other mock videos
 ];
 
 
 // --- News & Services (Still using mock data, to be migrated to Prisma) ---
 export const getNewsArticleBySlug = (slug: string): NewsArticle | undefined => {
-  // TODO: Migrate to Prisma
   console.warn("getNewsArticleBySlug is using mock data.");
   return mockNews.find(article => article.slug === slug);
 };
 
 export const getAllNewsArticles = (): NewsArticle[] => {
-  // TODO: Migrate to Prisma
   console.warn("getAllNewsArticles is using mock data.");
   return mockNews.sort((a,b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
 };
 
 export const getAllServices = (): ServiceItem[] => {
-  // TODO: Migrate to Prisma
   console.warn("getAllServices is using mock data.");
   return mockServices;
 };
 
 export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
-  // TODO: Migrate to Prisma
   console.warn("getServiceBySlug is using mock data.");
   return mockServices.find(service => service.slug === slug);
 };

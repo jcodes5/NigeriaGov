@@ -25,20 +25,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useEffect, useState, useTransition, useCallback } from "react";
-import type { User } from "@/types";
+import type { User as AppUser } from "@/types"; // Renamed to AppUser
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { getUsers as fetchUsersFromDB } from "@/lib/data"; // Renamed to avoid conflict
-import { deleteUser } from "@/lib/actions";
+import { getUsers as fetchUsersFromDB } from "@/lib/data";
+import { deleteUser as deleteUserAction } from "@/lib/actions"; // Renamed server action import
 
 export default function ManageUsersPage() {
-  const { user: currentUser, isAdmin, isLoading: authLoading } = useAuth();
+  const { profile: currentUserProfile, isAdmin, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isPending, startTransition] = useTransition();
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
 
   const loadUsers = useCallback(async () => {
     setIsLoadingData(true);
@@ -48,7 +48,7 @@ export default function ManageUsersPage() {
     } catch (error) {
       console.error("Failed to fetch users:", error);
       toast({ title: "Error", description: "Failed to load user data.", variant: "destructive" });
-      setUsers([]); // Set to empty array on error
+      setUsers([]);
     } finally {
       setIsLoadingData(false);
     }
@@ -64,12 +64,12 @@ export default function ManageUsersPage() {
         loadUsers();
       }
     }
-  }, [currentUser, isAdmin, authLoading, router, toast, loadUsers]);
+  }, [currentUserProfile, isAdmin, authLoading, router, toast, loadUsers]);
 
   const handleDeleteUser = async () => {
-    if (!userToDelete) return;
+    if (!userToDelete || !userToDelete.id) return;
 
-    if (userToDelete.id === currentUser?.id && currentUser?.role === 'admin') {
+    if (userToDelete.id === currentUserProfile?.id && currentUserProfile?.role === 'admin') {
       toast({
         title: "Action Denied",
         description: "You cannot delete your own admin account.",
@@ -78,47 +78,39 @@ export default function ManageUsersPage() {
       setUserToDelete(null);
       return;
     }
-    // This check might need updating if Supabase handles admin1 differently
-    if (userToDelete.id === "admin1" && userToDelete.email === "admin@example.com") {
-      toast({
-        title: "Action Denied",
-        description: "The primary mock admin account (admin@example.com) cannot be deleted.",
-        variant: "destructive",
-      });
-      setUserToDelete(null);
-      return;
-    }
+    
+    // Deletion of Supabase auth user itself is more complex and requires admin privileges on Supabase.
+    // This action primarily deletes from the public 'users' table.
+    // Add specific checks if there are critical users you don't want deleted from public.users
+    // e.g. if (userToDelete.email === "superadmin@example.com") { ... }
+
 
     startTransition(async () => {
-      const result = await deleteUser(userToDelete.id);
+      // Call the renamed server action
+      const result = await deleteUserAction(userToDelete.id!); 
       if (result.success) {
-        // Optimistically update UI or re-fetch
         setUsers((prevUsers) => prevUsers.filter((u) => u.id !== userToDelete.id));
-        // await loadUsers(); // Or re-fetch for consistency
-        toast({ title: "User Deleted", description: result.message });
+        toast({ title: "User Profile Deleted", description: result.message });
       } else {
         toast({ title: "Error", description: result.message, variant: "destructive" });
       }
       setUserToDelete(null);
     });
   };
+  
+  const overallLoading = authLoading || (isLoadingData && isAdmin);
 
-  if (authLoading || (!isAdmin && !authLoading)) { // Show loader if auth is loading OR if not admin and not finished auth loading
+  if (overallLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">Verifying admin access...</p>
+        <p className="ml-3 text-lg">{authLoading ? "Verifying admin access..." : "Loading user data..."}</p>
       </div>
     );
   }
   
-  if (isLoadingData && isAdmin) { // Show data loading indicator only if confirmed admin
-     return (
-      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">Loading user data...</p>
-      </div>
-    );
+  if (!isAdmin && !authLoading) { // Fallback if useEffect redirect fails
+      return null; 
   }
 
 
@@ -128,10 +120,10 @@ export default function ManageUsersPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <CardTitle className="font-headline text-2xl">Manage Users</CardTitle>
-            <CardDescription>View, edit, and manage user accounts from the database.</CardDescription>
+            <CardDescription>View, edit, and manage user profiles from the database.</CardDescription>
           </div>
           <Button className="button-hover w-full sm:w-auto">
-            <UserPlus className="mr-2 h-4 w-4" /> Add New User
+            <UserPlus className="mr-2 h-4 w-4" /> Add New User (Coming Soon)
           </Button>
         </CardHeader>
       </Card>
@@ -152,7 +144,7 @@ export default function ManageUsersPage() {
               {users.length === 0 && !isLoadingData ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No users found in the database.
+                    No user profiles found in the database.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -177,20 +169,20 @@ export default function ManageUsersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled={isPending}>Edit User</DropdownMenuItem>
-                          <DropdownMenuItem disabled={isPending || user.id === currentUser?.id || (user.id === "admin1" && user.email === "admin@example.com")}>
-                            {user.role === 'user' ? 'Make Admin' : 'Make User'}
+                          <DropdownMenuItem disabled={isPending}>Edit User (Coming Soon)</DropdownMenuItem>
+                          <DropdownMenuItem disabled={isPending || user.id === currentUserProfile?.id}>
+                            {user.role === 'user' ? 'Make Admin (Coming Soon)' : 'Make User (Coming Soon)'}
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled={isPending || user.id === currentUser?.id || (user.id === "admin1" && user.email === "admin@example.com")}>
-                            Deactivate User
+                          <DropdownMenuItem disabled={isPending || user.id === currentUserProfile?.id}>
+                            Deactivate User (Coming Soon)
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setUserToDelete(user)}
                             className="text-destructive"
-                            disabled={isPending || user.id === currentUser?.id || (user.id === "admin1" && user.email === "admin@example.com")}
+                            disabled={isPending || user.id === currentUserProfile?.id}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete User
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete User Profile
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -207,9 +199,9 @@ export default function ManageUsersPage() {
         <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure you want to delete this user?</AlertDialogTitle>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the user account for "{userToDelete.name}" ({userToDelete.email}) from the database.
+                This action will delete the user profile for "{userToDelete.name || userToDelete.email}" from the public user table. This does not automatically delete their Supabase authentication account. Are you sure you want to proceed?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -221,7 +213,7 @@ export default function ManageUsersPage() {
                 disabled={isPending}
                 className="bg-destructive hover:bg-destructive/90"
               >
-                {isPending ? "Deleting..." : "Delete User"}
+                {isPending ? "Deleting..." : "Delete Profile"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

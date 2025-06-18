@@ -13,8 +13,6 @@ import {
   SidebarFooter,
   SidebarInset,
   SidebarMenuSubButton,
-  // SidebarMenuSub,
-  // SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/common/logo";
@@ -40,19 +38,20 @@ import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const DashboardSidebarContent = () => {
-  const { isAdmin, logout } = useAuth();
+  const { isAdmin, logout } = useAuth(); // profile.role is now source of isAdmin
   const router = useRouter();
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout(); // logout is now async
     router.push("/");
+    router.refresh(); // Refresh to ensure server components update
   };
   
   const closeMobileSidebar = () => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) { // md breakpoint
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setOpenMobile(false);
     }
   }
@@ -136,16 +135,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuth();
+  const { authUser, isLoading, profile } = useAuth(); // Using authUser from Supabase and profile from our DB
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/login?redirect=/dashboard/user");
+    if (!isLoading && !authUser) {
+      // If not loading and no Supabase user, redirect to login
+      // Preserve the current path for redirection after login
+      const currentPath = pathname;
+      router.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
     }
-  }, [user, isLoading, router]);
+  }, [authUser, isLoading, router, pathname]);
 
-  if (isLoading || !user) {
+  if (isLoading || !authUser) { // Still loading or no Supabase user
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
@@ -153,6 +156,21 @@ export default function DashboardLayout({
       </div>
     );
   }
+  
+  // If Supabase user exists but profile is still loading (it might be a brief moment or if DB call fails)
+  // You might want a more specific loading indicator for profile fetching if it's slow
+  if (!profile && !isLoading) {
+     // This case could mean the profile doesn't exist in public.users or failed to fetch.
+     // For now, we show a generic loading, but you might want to handle this more gracefully.
+     // E.g., redirect to a profile setup page or show an error.
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+        <p className="ml-4 text-lg">Loading user profile...</p>
+      </div>
+    );
+  }
+
 
   return (
     <SidebarProvider defaultOpen={true}>
