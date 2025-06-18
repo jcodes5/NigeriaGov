@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { MoreHorizontal, MessageSquare, Star } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
-import type { Feedback } from "@/types"; 
-import { getAllFeedbackWithProjectTitles } from "@/lib/data"; 
+import type { Feedback } from "@/types";
+import { getAllFeedbackWithProjectTitles } from "@/lib/data";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from 'date-fns';
@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 type AggregatedFeedback = Feedback & { projectTitle: string };
 
 export default function ManageFeedbackPage() {
-  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const { profile, isAdmin, isLoading: authLoading } = useAuth(); // Changed user to profile for consistency
   const router = useRouter();
   const { toast } = useToast();
   const [allFeedback, setAllFeedback] = useState<AggregatedFeedback[]>([]);
@@ -31,9 +31,9 @@ export default function ManageFeedbackPage() {
         if (!isAdmin) {
           toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
           router.replace("/dashboard/user");
-          return; // Important to return after navigation
+          return;
         }
-        
+
         setIsLoadingData(true);
         try {
           const feedbackList = await getAllFeedbackWithProjectTitles();
@@ -47,9 +47,9 @@ export default function ManageFeedbackPage() {
       }
     };
     fetchFeedback();
-  }, [user, isAdmin, authLoading, router, toast]);
+  }, [profile, isAdmin, authLoading, router, toast]); // Updated dependency array
 
-  if (authLoading || (isLoadingData && isAdmin)) { // Show loader if auth is loading OR if admin and data is loading
+  if (authLoading || (isLoadingData && isAdmin)) {
     return (
       <div className="space-y-8">
         <Card>
@@ -83,10 +83,9 @@ export default function ManageFeedbackPage() {
       </div>
     );
   }
-  
-  if (!isAdmin && !authLoading) { // Handle case where user is not admin and auth is complete
-      // Toast and redirect is handled in useEffect, this is a fallback or to prevent rendering anything further
-      return null; 
+
+  if (!isAdmin && !authLoading) {
+      return null;
   }
 
 
