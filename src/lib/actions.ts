@@ -8,12 +8,14 @@ import {
   deleteUserById as removeUserFromDb,
   createUserProfileInDb,
   getUserProfileFromDb,
-  createProjectInDb as saveProjectToDb, // Renamed for clarity
+  createProjectInDb as saveProjectToDb, 
   type ProjectCreationData,
-  createNewsArticleInDb as saveNewsArticleToDb, // Renamed for clarity
+  createNewsArticleInDb as saveNewsArticleToDb, 
   type NewsArticleCreationData,
+  updateNewsArticleInDb,
+  deleteNewsArticleFromDb,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, NewsArticleFormData } from '@/types';
 import prisma from './prisma';
 
 
@@ -183,16 +185,23 @@ export async function addProject(
 }
 
 export async function addNewsArticle(
-  newsData: NewsArticleCreationData
+  newsData: NewsArticleFormData
 ): Promise<ActionResult<AppNewsArticle>> {
   try {
-    // Basic slug check (Prisma will enforce uniqueness at DB level)
-    const existingArticle = await prisma.newsArticle.findUnique({ where: { slug: newsData.slug }});
-    if (existingArticle) {
+    // Basic slug check (Prisma will enforce uniqueness at DB level if schema is correct)
+    const existingArticleBySlug = await prisma.newsArticle.findUnique({ where: { slug: newsData.slug }});
+    if (existingArticleBySlug) {
       return { success: false, message: `A news article with the slug "${newsData.slug}" already exists.`};
     }
 
-    const newArticle = await saveNewsArticleToDb(newsData);
+    const dataToSave: NewsArticleCreationData = {
+      ...newsData,
+      published_date: newsData.publishedDate, // Ensure field name matches Prisma schema
+      image_url: newsData.imageUrl,
+      data_ai_hint: newsData.dataAiHint,
+    };
+
+    const newArticle = await saveNewsArticleToDb(dataToSave);
     if (!newArticle) {
       return { success: false, message: 'Failed to save news article to the database.' };
     }
@@ -212,5 +221,72 @@ export async function addNewsArticle(
       }
     }
     return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function updateNewsArticle(
+  id: string,
+  newsData: NewsArticleFormData
+): Promise<ActionResult<AppNewsArticle>> {
+  try {
+    // If slug is being updated, check for uniqueness excluding the current article
+    if (newsData.slug) {
+      const existingArticleBySlug = await prisma.newsArticle.findFirst({ 
+        where: { 
+          slug: newsData.slug,
+          id: { not: id } // Exclude the current article from the check
+        }
+      });
+      if (existingArticleBySlug) {
+        return { success: false, message: `Another news article with the slug "${newsData.slug}" already exists.`};
+      }
+    }
+    
+    const dataToUpdate: Partial<NewsArticleCreationData> = {
+      ...newsData,
+      published_date: newsData.publishedDate,
+      image_url: newsData.imageUrl,
+      data_ai_hint: newsData.dataAiHint,
+    };
+
+
+    const updatedArticle = await updateNewsArticleInDb(id, dataToUpdate);
+    if (!updatedArticle) {
+      return { success: false, message: 'Failed to update news article in the database.' };
+    }
+
+    revalidatePath('/news');
+    revalidatePath(`/news/${updatedArticle.slug}`); // Revalidate old and new slug if slug changes (not handled here yet)
+    revalidatePath('/dashboard/admin/manage-news');
+    revalidatePath('/'); 
+    return { success: true, message: 'News article updated successfully!', item: updatedArticle };
+  } catch (error) {
+    console.error('Error updating news article:', error);
+    let errorMessage = 'An unexpected error occurred while updating the news article.';
+     if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('slug')) {
+          errorMessage = 'A news article with this slug already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+
+export async function deleteNewsArticle(id: string): Promise<ActionResult> {
+  try {
+    const success = await deleteNewsArticleFromDb(id);
+    if (!success) {
+      return { success: false, message: 'Failed to delete news article from the database.' };
+    }
+
+    revalidatePath('/news');
+    revalidatePath('/dashboard/admin/manage-news');
+    revalidatePath('/');
+    return { success: true, message: 'News article deleted successfully!' };
+  } catch (error) {
+    console.error('Error deleting news article:', error);
+    return { success: false, message: 'An unexpected error occurred while deleting the news article.', errorDetails: error instanceof Error ? error.stack : undefined };
   }
 }

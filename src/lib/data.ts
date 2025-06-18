@@ -108,13 +108,13 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
     slug: prismaNews.slug,
     title: prismaNews.title,
     summary: prismaNews.summary,
-    imageUrl: prismaNews.imageUrl,
-    dataAiHint: prismaNews.dataAiHint,
+    imageUrl: prismaNews.image_url, // Corrected mapping
+    dataAiHint: prismaNews.data_ai_hint, // Corrected mapping
     category: prismaNews.category,
-    publishedDate: new Date(prismaNews.publishedDate), // Prisma returns Date
+    publishedDate: new Date(prismaNews.published_date), // Corrected mapping
     content: prismaNews.content,
-    createdAt: new Date(prismaNews.createdAt),
-    updatedAt: new Date(prismaNews.updatedAt),
+    createdAt: new Date(prismaNews.created_at),
+    updatedAt: new Date(prismaNews.updated_at),
   };
 };
 
@@ -153,10 +153,8 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
   }
 };
 
-export type ProjectCreationData = Omit<PrismaProject, 'id' | 'created_at' | 'last_updated_at' | 'images' | 'videos' | 'impact_stats'> & {
+export type ProjectCreationData = Omit<PrismaProject, 'id' | 'created_at' | 'last_updated_at' | 'images' | 'videos' | 'impact_stats' | 'feedback_list'> & {
   tags?: string[];
-  // Omitting images, videos, impact_stats for now as they are complex JSON fields
-  // They will be initialized as empty or null in the DB by default.
 };
 
 export const createProjectInDb = async (projectData: ProjectCreationData): Promise<AppProject | null> => {
@@ -164,12 +162,11 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
     const newProject = await prisma.project.create({
       data: {
         ...projectData,
-        budget: projectData.budget ?? undefined, // Ensure null or number
-        expenditure: projectData.expenditure ?? undefined, // Ensure null or number
-        images: [], // Initialize as empty array
-        videos: [], // Initialize as empty array
-        impact_stats: [], // Initialize as empty array
-        // Prisma handles created_at and last_updated_at automatically
+        budget: projectData.budget ?? undefined, 
+        expenditure: projectData.expenditure ?? undefined,
+        images: [], 
+        videos: [], 
+        impact_stats: [], 
       },
     });
     return mapPrismaProjectToAppProject(newProject);
@@ -312,11 +309,23 @@ export const getNewsArticleBySlug = async (slug: string): Promise<AppNewsArticle
   }
 };
 
+export const getNewsArticleById = async (id: string): Promise<AppNewsArticle | null> => {
+  try {
+    const newsArticle = await prisma.newsArticle.findUnique({
+      where: { id },
+    });
+    return newsArticle ? mapPrismaNewsToAppNews(newsArticle) : null;
+  } catch (error) {
+    console.error(`Error fetching news article by ID "${id}" with Prisma:`, error);
+    return null;
+  }
+};
+
 export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   try {
     const newsArticles = await prisma.newsArticle.findMany({
       orderBy: {
-        publishedDate: 'desc',
+        published_date: 'desc',
       },
     });
     return newsArticles.map(mapPrismaNewsToAppNews);
@@ -326,17 +335,56 @@ export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   }
 };
 
-export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'created_at' | 'updated_at'>;
 
 export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): Promise<AppNewsArticle | null> => {
   try {
     const newArticle = await prisma.newsArticle.create({
-      data: newsData,
+      data: {
+        ...newsData,
+        image_url: newsData.image_url || null, // Ensure null if empty string
+        data_ai_hint: newsData.data_ai_hint || null, // Ensure null if empty string
+      }
     });
     return mapPrismaNewsToAppNews(newArticle);
   } catch (error) {
     console.error('Error creating news article in DB with Prisma:', error);
     return null;
+  }
+};
+
+export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsArticleCreationData>): Promise<AppNewsArticle | null> => {
+  try {
+    // Ensure publishedDate is a Date object if provided
+    const dataToUpdate = { ...newsData };
+    if (dataToUpdate.published_date && typeof dataToUpdate.published_date === 'string') {
+      dataToUpdate.published_date = new Date(dataToUpdate.published_date);
+    }
+    
+    const updatedArticle = await prisma.newsArticle.update({
+      where: { id },
+      data: {
+        ...dataToUpdate,
+        image_url: dataToUpdate.image_url === '' ? null : dataToUpdate.image_url,
+        data_ai_hint: dataToUpdate.data_ai_hint === '' ? null : dataToUpdate.data_ai_hint,
+      },
+    });
+    return mapPrismaNewsToAppNews(updatedArticle);
+  } catch (error) {
+    console.error(`Error updating news article with ID "${id}" in DB with Prisma:`, error);
+    return null;
+  }
+};
+
+export const deleteNewsArticleFromDb = async (id: string): Promise<boolean> => {
+  try {
+    await prisma.newsArticle.delete({
+      where: { id },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting news article with ID "${id}" from DB with Prisma:`, error);
+    return false;
   }
 };
 
@@ -379,11 +427,8 @@ export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
 
 // --- Mock Data (to be phased out as features are migrated) ---
 export const MOCK_PROJECTS_TEMP: AppProject[] = []; // No longer primary source for projects
-export const mockNews: AppNewsArticle[] = []; // No longer primary source for news
 export const mockFeaturedVideos: Video[] = [
   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
 ];
-// export const projects: AppProject[] = MOCK_PROJECTS_TEMP; // This alias is no longer needed as getAllProjects is primary
-

@@ -12,11 +12,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addNewsArticle } from "@/lib/actions";
+import { addNewsArticle, updateNewsArticle } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { newsArticleFormSchemaRaw } from "@/types";
+import { newsArticleFormSchemaRaw, type NewsArticle, type NewsArticleFormData } from "@/types";
+import { useEffect } from "react";
 
 // Construct the Zod schema using the imported raw parts
 const newsSchema = z.object({
@@ -31,19 +32,25 @@ const newsSchema = z.object({
 });
 
 
-type NewsArticleFormData = z.infer<typeof newsSchema>;
-
 interface NewsArticleFormProps {
-  article?: NewsArticleFormData; // For editing
+  initialData?: NewsArticle; // For editing
+  articleId?: string; // For editing
   onSuccess?: () => void;
 }
 
-export function NewsArticleForm({ article, onSuccess }: NewsArticleFormProps) {
+export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArticleFormProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<NewsArticleFormData>({
+  const isEditMode = !!articleId;
+
+  const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue } = useForm<NewsArticleFormData>({
     resolver: zodResolver(newsSchema),
-    defaultValues: article || {
+    defaultValues: initialData ? {
+      ...initialData,
+      publishedDate: initialData.publishedDate ? new Date(initialData.publishedDate) : new Date(),
+      imageUrl: initialData.imageUrl || "", // Ensure string for form
+      dataAiHint: initialData.dataAiHint || "", // Ensure string for form
+    } : {
       title: "",
       slug: "",
       summary: "",
@@ -54,28 +61,45 @@ export function NewsArticleForm({ article, onSuccess }: NewsArticleFormProps) {
       dataAiHint: "",
     },
   });
+  
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        ...initialData,
+        publishedDate: initialData.publishedDate ? new Date(initialData.publishedDate) : new Date(),
+        imageUrl: initialData.imageUrl || "",
+        dataAiHint: initialData.dataAiHint || "",
+      });
+    }
+  }, [initialData, reset]);
+
 
   const onSubmit: SubmitHandler<NewsArticleFormData> = async (data) => {
-    // Ensure optional fields are null if empty, or Prisma might complain
     const dataToSubmit = {
       ...data,
-      imageUrl: data.imageUrl || null,
-      dataAiHint: data.dataAiHint || null,
+      imageUrl: data.imageUrl || null, // Ensure null if empty string
+      dataAiHint: data.dataAiHint || null, // Ensure null if empty string
     };
 
-    const result = await addNewsArticle(dataToSubmit);
+    let result;
+    if (isEditMode && articleId) {
+      result = await updateNewsArticle(articleId, dataToSubmit);
+    } else {
+      result = await addNewsArticle(dataToSubmit);
+    }
 
     if (result.success) {
       toast({
-        title: "News Article Added!",
+        title: isEditMode ? "News Article Updated!" : "News Article Added!",
         description: result.message,
       });
-      reset(); 
+      if (!isEditMode) reset(); // Only reset if adding new
       if (onSuccess) onSuccess();
       router.push("/dashboard/admin/manage-news");
+      router.refresh(); // Ensure list page is updated
     } else {
       toast({
-        title: "Error Adding News Article",
+        title: isEditMode ? "Error Updating Article" : "Error Adding Article",
         description: result.message || "An unknown error occurred.",
         variant: "destructive",
       });
@@ -93,8 +117,9 @@ export function NewsArticleForm({ article, onSuccess }: NewsArticleFormProps) {
         </div>
         <div>
           <Label htmlFor="slug">Slug (URL-friendly identifier)</Label>
-          <Input id="slug" {...register("slug")} className="mt-1" placeholder="e.g., new-policy-announced" />
+          <Input id="slug" {...register("slug")} className="mt-1" placeholder="e.g., new-policy-announced" readOnly={isEditMode} />
           {errors.slug && <p className="text-sm text-destructive mt-1">{errors.slug.message}</p>}
+           {isEditMode && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
         </div>
       </div>
       
@@ -123,11 +148,11 @@ export function NewsArticleForm({ article, onSuccess }: NewsArticleFormProps) {
                     className={cn("w-full justify-start text-left font-normal mt-1", !field.value && "text-muted-foreground")}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                    {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                  <Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={field.onChange} initialFocus />
                 </PopoverContent>
               </Popover>
             )}
@@ -156,7 +181,7 @@ export function NewsArticleForm({ article, onSuccess }: NewsArticleFormProps) {
       </div>
 
       <Button type="submit" className="w-full sm:w-auto button-hover" disabled={isSubmitting}>
-        {isSubmitting ? "Adding Article..." : "Add News Article"}
+        {isSubmitting ? (isEditMode ? "Updating..." : "Adding...") : (isEditMode ? "Update Article" : "Add News Article")}
       </Button>
     </form>
   );

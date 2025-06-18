@@ -136,6 +136,18 @@ export const newsArticleFormSchemaRaw = {
   category: (z: any) => z.string().min(2, "Category must be at least 2 characters.").max(50),
   publishedDate: (z: any) => z.date({ required_error: "Published date is required."}),
   content: (z: any) => z.string().min(50, "Content must be at least 50 characters."),
-  imageUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')),
-  dataAiHint: (z: any) => z.string().max(50, "AI hint too long.").optional(),
+  imageUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  dataAiHint: (z: any) => z.string().max(50, "AI hint too long.").optional().nullable(),
+};
+
+// For the form data, we might not include ID directly in Zod schema if it's passed separately
+export type NewsArticleFormData = {
+  title: string;
+  slug: string;
+  summary: string;
+  category: string;
+  publishedDate: Date;
+  content: string;
+  imageUrl?: string | null;
+  dataAiHint?: string | null;
 };
