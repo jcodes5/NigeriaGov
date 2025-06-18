@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 
 export default function ManageNewsPage() {
   const { profile, isAdmin, isLoading: authLoading } = useAuth();
@@ -34,7 +35,7 @@ export default function ManageNewsPage() {
         
         setIsLoadingData(true);
         try {
-          const fetchedNews = await getAllNewsArticles();
+          const fetchedNews = await getAllNewsArticles(); // Fetches from DB
           setNewsArticles(fetchedNews);
         } catch (error) {
           console.error("Failed to fetch news articles for admin:", error);
@@ -59,7 +60,7 @@ export default function ManageNewsPage() {
               <Skeleton className="h-8 w-1/2" />
               <Skeleton className="h-4 w-3/4 mt-1" />
             </div>
-            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-40" /> {/* Adjusted width for new button */}
           </CardHeader>
         </Card>
         <Card>
@@ -88,7 +89,7 @@ export default function ManageNewsPage() {
     );
   }
   
-  if (!isAdmin && !authLoading) {
+  if (!isAdmin && !authLoading) { 
       return null; 
   }
 
@@ -100,8 +101,10 @@ export default function ManageNewsPage() {
             <CardTitle className="font-headline text-2xl flex items-center"><Newspaper className="mr-2 h-6 w-6"/>Manage News Articles</CardTitle>
             <CardDescription>Add, edit, and publish news articles from the database.</CardDescription>
           </div>
-          <Button className="button-hover w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4"/> Add New Article (Coming Soon)
+          <Button asChild className="button-hover w-full sm:w-auto">
+            <Link href="/dashboard/admin/manage-news/add">
+              <PlusCircle className="mr-2 h-4 w-4"/> Add New Article
+            </Link>
           </Button>
         </CardHeader>
       </Card>

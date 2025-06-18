@@ -153,6 +153,32 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
   }
 };
 
+export type ProjectCreationData = Omit<PrismaProject, 'id' | 'created_at' | 'last_updated_at' | 'images' | 'videos' | 'impact_stats'> & {
+  tags?: string[];
+  // Omitting images, videos, impact_stats for now as they are complex JSON fields
+  // They will be initialized as empty or null in the DB by default.
+};
+
+export const createProjectInDb = async (projectData: ProjectCreationData): Promise<AppProject | null> => {
+  try {
+    const newProject = await prisma.project.create({
+      data: {
+        ...projectData,
+        budget: projectData.budget ?? undefined, // Ensure null or number
+        expenditure: projectData.expenditure ?? undefined, // Ensure null or number
+        images: [], // Initialize as empty array
+        videos: [], // Initialize as empty array
+        impact_stats: [], // Initialize as empty array
+        // Prisma handles created_at and last_updated_at automatically
+      },
+    });
+    return mapPrismaProjectToAppProject(newProject);
+  } catch (error) {
+    console.error('Error creating project in DB with Prisma:', error);
+    return null;
+  }
+};
+
 
 // --- Feedback Data Functions (Prisma Integrated) ---
 export const addFeedbackToProject = async (
@@ -300,6 +326,20 @@ export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   }
 };
 
+export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'createdAt' | 'updatedAt'>;
+
+export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): Promise<AppNewsArticle | null> => {
+  try {
+    const newArticle = await prisma.newsArticle.create({
+      data: newsData,
+    });
+    return mapPrismaNewsToAppNews(newArticle);
+  } catch (error) {
+    console.error('Error creating news article in DB with Prisma:', error);
+    return null;
+  }
+};
+
 
 // --- Services (Still using mock data, to be migrated to Prisma) ---
 export const mockServices: ServiceItem[] = [
@@ -345,4 +385,5 @@ export const mockFeaturedVideos: Video[] = [
   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
 ];
-export const projects: AppProject[] = MOCK_PROJECTS_TEMP; // Temporary alias for compatibility during migration
+// export const projects: AppProject[] = MOCK_PROJECTS_TEMP; // This alias is no longer needed as getAllProjects is primary
+

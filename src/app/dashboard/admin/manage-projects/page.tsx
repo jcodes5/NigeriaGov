@@ -10,10 +10,11 @@ import { MoreHorizontal, PlusCircle, Construction } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import type { Project } from "@/types"; 
-import { getAllProjects } from "@/lib/data"; // Updated to fetch from DB (via Prisma)
+import { getAllProjects } from "@/lib/data"; 
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 
 export default function ManageProjectsPage() {
   const { profile, isAdmin, isLoading: authLoading } = useAuth();
@@ -33,7 +34,7 @@ export default function ManageProjectsPage() {
         
         setIsLoadingData(true);
         try {
-          const fetchedProjects = await getAllProjects();
+          const fetchedProjects = await getAllProjects(); // Fetches from DB
           setProjects(fetchedProjects);
         } catch (error) {
           console.error("Failed to fetch projects for admin:", error);
@@ -58,7 +59,7 @@ export default function ManageProjectsPage() {
               <Skeleton className="h-8 w-1/2" />
               <Skeleton className="h-4 w-3/4 mt-1" />
             </div>
-            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-40" /> {/* Adjusted width for new button */}
           </CardHeader>
         </Card>
         <Card>
@@ -87,7 +88,7 @@ export default function ManageProjectsPage() {
     );
   }
   
-  if (!isAdmin && !authLoading) { // Fallback if useEffect redirect fails
+  if (!isAdmin && !authLoading) { 
       return null; 
   }
 
@@ -106,8 +107,10 @@ export default function ManageProjectsPage() {
             <CardTitle className="font-headline text-2xl flex items-center"><Construction className="mr-2 h-6 w-6"/>Manage Projects</CardTitle>
             <CardDescription>Add, edit, and oversee all government projects from the database.</CardDescription>
           </div>
-          <Button className="button-hover w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4"/> Add New Project (Coming Soon)
+          <Button asChild className="button-hover w-full sm:w-auto">
+            <Link href="/dashboard/admin/manage-projects/add">
+              <PlusCircle className="mr-2 h-4 w-4"/> Add New Project
+            </Link>
           </Button>
         </CardHeader>
       </Card>
@@ -170,3 +173,4 @@ export default function ManageProjectsPage() {
     </div>
   );
 }
+

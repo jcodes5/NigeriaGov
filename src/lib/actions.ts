@@ -6,10 +6,14 @@ import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from
 import { 
   addFeedbackToProject as saveFeedbackToDb, 
   deleteUserById as removeUserFromDb,
-  createUserProfileInDb, // New function for creating user profile in public.users
-  getUserProfileFromDb // New function for fetching user profile
+  createUserProfileInDb,
+  getUserProfileFromDb,
+  createProjectInDb as saveProjectToDb, // Renamed for clarity
+  type ProjectCreationData,
+  createNewsArticleInDb as saveNewsArticleToDb, // Renamed for clarity
+  type NewsArticleCreationData,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle } from '@/types';
 import prisma from './prisma';
 
 
@@ -28,7 +32,6 @@ export async function submitProjectFeedback(
     const sentimentInput: SummarizeFeedbackSentimentInput = {
       feedback: formData.comment,
     };
-    // Assuming summarizeFeedbackSentiment doesn't require auth and is safe to call
     const sentimentOutput = await summarizeFeedbackSentiment(sentimentInput);
     
     const feedbackToSave = {
@@ -36,10 +39,9 @@ export async function submitProjectFeedback(
       comment: formData.comment,
       rating: formData.rating,
       sentimentSummary: sentimentOutput.sentimentSummary,
-      userId: formData.userId || null, // Ensure it's null if undefined
+      userId: formData.userId || null,
     };
 
-    // Use the renamed function for clarity
     const savedFeedback = await saveFeedbackToDb(projectId, feedbackToSave);
 
     if (!savedFeedback) {
@@ -74,9 +76,6 @@ export interface DeleteUserResult {
 
 export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   try {
-    // This check might need to be re-evaluated if "admin1" ID is a real UUID in your DB
-    // For Supabase Auth, user deletion should ideally be handled via Supabase admin SDK if you need to delete the auth user too.
-    // This action currently only deletes from the public.users table.
     const { success, error } = await removeUserFromDb(userId);
 
     if (success) {
@@ -96,16 +95,15 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   }
 }
 
-// New server action to synchronize user profile from Supabase Auth to our public users table
 export async function syncUserProfile(
   data: { userId: string; email: string; name: string; avatarUrl?: string | null }
 ): Promise<{ user: AppUser | null; error: string | null }> {
   try {
     const profile = await createUserProfileInDb({
-      id: data.userId, // Use Supabase Auth user ID as primary key for our public user table
+      id: data.userId,
       email: data.email,
       name: data.name,
-      role: 'user', // Default role
+      role: 'user', 
       avatar_url: data.avatarUrl || null,
     });
     if (profile) {
@@ -115,22 +113,17 @@ export async function syncUserProfile(
   } catch (error) {
     console.error("Error syncing user profile:", error);
     if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('email')) {
-      // Handle unique constraint violation for email - user might exist
-      // Try to fetch existing profile by email if ID doesn't match
-      // This logic can get complex, for now, we return a specific error
       return { user: null, error: "A user with this email may already exist. If this is you, try logging in." };
     }
      if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('PRIMARY')) {
-      // Primary key conflict, user likely already exists from a previous attempt or manual entry
       const existingUser = await getUserProfileFromDb(data.userId);
-      if (existingUser) return { user: existingUser, error: null }; // User already exists, consider it a success
+      if (existingUser) return { user: existingUser, error: null }; 
       return { user: null, error: "User profile already exists, but could not be retrieved." };
     }
     return { user: null, error: error instanceof Error ? error.message : "An unknown error occurred during profile sync." };
   }
 }
 
-// New server action to get user profile by ID (called by AuthContext)
 export async function getUserProfile(userId: string): Promise<AppUser | null> {
   try {
     const profile = await getUserProfileFromDb(userId);
@@ -138,5 +131,86 @@ export async function getUserProfile(userId: string): Promise<AppUser | null> {
   } catch (error) {
     console.error(`Error fetching profile for user ${userId}:`, error);
     return null;
+  }
+}
+
+// Server Action Result Type
+interface ActionResult<T = null> {
+  success: boolean;
+  message: string;
+  item?: T;
+  errorDetails?: string;
+}
+
+export async function addProject(
+  projectData: Omit<ProjectCreationData, 'ministry_id' | 'state_id'> & { ministryId: string; stateId: string;}
+): Promise<ActionResult<AppProject>> {
+  try {
+    const dataToSave: ProjectCreationData = {
+      title: projectData.title,
+      subtitle: projectData.subtitle,
+      ministry_id: projectData.ministryId,
+      state_id: projectData.stateId,
+      status: projectData.status,
+      start_date: projectData.startDate,
+      expected_end_date: projectData.expectedEndDate,
+      description: projectData.description,
+      budget: projectData.budget,
+      expenditure: projectData.expenditure,
+      tags: projectData.tags,
+    };
+
+    const newProject = await saveProjectToDb(dataToSave);
+    if (!newProject) {
+      return { success: false, message: 'Failed to save project to the database.' };
+    }
+
+    revalidatePath('/projects');
+    revalidatePath('/dashboard/admin/manage-projects');
+    revalidatePath('/'); // For featured projects on homepage
+    return { success: true, message: 'Project added successfully!', item: newProject };
+  } catch (error) {
+    console.error('Error adding project:', error);
+    let errorMessage = 'An unexpected error occurred while adding the project.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('title')) { // Example for unique constraint, adjust if needed
+          errorMessage = 'A project with this title already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function addNewsArticle(
+  newsData: NewsArticleCreationData
+): Promise<ActionResult<AppNewsArticle>> {
+  try {
+    // Basic slug check (Prisma will enforce uniqueness at DB level)
+    const existingArticle = await prisma.newsArticle.findUnique({ where: { slug: newsData.slug }});
+    if (existingArticle) {
+      return { success: false, message: `A news article with the slug "${newsData.slug}" already exists.`};
+    }
+
+    const newArticle = await saveNewsArticleToDb(newsData);
+    if (!newArticle) {
+      return { success: false, message: 'Failed to save news article to the database.' };
+    }
+
+    revalidatePath('/news');
+    revalidatePath(`/news/${newArticle.slug}`);
+    revalidatePath('/dashboard/admin/manage-news');
+    revalidatePath('/'); // For latest news on homepage
+    return { success: true, message: 'News article added successfully!', item: newArticle };
+  } catch (error) {
+    console.error('Error adding news article:', error);
+    let errorMessage = 'An unexpected error occurred while adding the news article.';
+     if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('slug')) {
+          errorMessage = 'A news article with this slug already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
   }
 }

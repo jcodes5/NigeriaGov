@@ -105,3 +105,37 @@ export interface ServiceItem {
   imageUrl?: string;
   dataAiHint?: string;
 }
+
+// Zod schema for Project Form (can be defined here or in the form component)
+export const projectFormSchemaRaw = {
+  title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(150),
+  subtitle: (z: any) => z.string().min(10, "Subtitle must be at least 10 characters.").max(250),
+  ministryId: (z: any) => z.string().min(1, "Ministry is required."),
+  stateId: (z: any) => z.string().min(1, "State is required."),
+  status: (z: any) => z.enum(['Planned', 'Ongoing', 'Completed', 'On Hold']),
+  startDate: (z: any) => z.date({ required_error: "Start date is required." }),
+  expectedEndDate: (z: any) => z.date().optional().nullable(),
+  description: (z: any) => z.string().min(20, "Description must be at least 20 characters."),
+  budget: (z: any) => z.preprocess(
+    (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
+    z.number().positive("Budget must be a positive number.").optional().nullable()
+  ),
+  expenditure: (z: any) => z.preprocess(
+    (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
+    z.number().positive("Expenditure must be a positive number.").optional().nullable()
+  ),
+  tags: (z: any) => z.string().optional(), // Comma-separated
+};
+
+
+export const newsArticleFormSchemaRaw = {
+  title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(200),
+  slug: (z: any) => z.string().min(3, "Slug must be at least 3 characters.").max(200)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens."),
+  summary: (z: any) => z.string().min(10, "Summary must be at least 10 characters.").max(500),
+  category: (z: any) => z.string().min(2, "Category must be at least 2 characters.").max(50),
+  publishedDate: (z: any) => z.date({ required_error: "Published date is required."}),
+  content: (z: any) => z.string().min(50, "Content must be at least 50 characters."),
+  imageUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')),
+  dataAiHint: (z: any) => z.string().max(50, "AI hint too long.").optional(),
+};
