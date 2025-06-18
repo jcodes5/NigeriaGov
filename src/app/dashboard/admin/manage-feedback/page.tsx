@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import { MoreHorizontal, MessageSquare, Star } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
-import type { Feedback, Project } from "@/types"; 
-import { getAllProjects } from "@/lib/data"; 
+import type { Feedback } from "@/types"; 
+import { getAllFeedbackWithProjectTitles } from "@/lib/data"; 
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from 'date-fns';
+import { Skeleton } from "@/components/ui/skeleton";
 
 type AggregatedFeedback = Feedback & { projectTitle: string };
 
@@ -22,35 +23,72 @@ export default function ManageFeedbackPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [allFeedback, setAllFeedback] = useState<AggregatedFeedback[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!isAdmin) {
-        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-        router.replace("/dashboard/user");
-      } else {
-        const projects = getAllProjects();
-        const feedbackList: AggregatedFeedback[] = [];
-        projects.forEach(project => {
-          project.feedback?.forEach(fb => {
-            feedbackList.push({ ...fb, projectTitle: project.title });
-          });
-        });
-        // Sort by newest first
-        feedbackList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setAllFeedback(feedbackList);
+    const fetchFeedback = async () => {
+      if (!authLoading) {
+        if (!isAdmin) {
+          toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+          router.replace("/dashboard/user");
+          return; // Important to return after navigation
+        }
+        
+        setIsLoadingData(true);
+        try {
+          const feedbackList = await getAllFeedbackWithProjectTitles();
+          setAllFeedback(feedbackList);
+        } catch (error) {
+          console.error("Failed to fetch feedback:", error);
+          toast({ title: "Error", description: "Failed to load feedback.", variant: "destructive"});
+        } finally {
+          setIsLoadingData(false);
+        }
       }
-    }
+    };
+    fetchFeedback();
   }, [user, isAdmin, authLoading, router, toast]);
 
-  if (authLoading || !isAdmin) {
+  if (authLoading || (isLoadingData && isAdmin)) { // Show loader if auth is loading OR if admin and data is loading
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">Verifying admin access and loading feedback...</p>
+      <div className="space-y-8">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {[...Array(7)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(3)].map((_, i) => (
+                  <TableRow key={i}>
+                    {[...Array(7)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+         <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <p className="ml-3 text-lg">Verifying access and loading feedback...</p>
+        </div>
       </div>
     );
   }
+  
+  if (!isAdmin && !authLoading) { // Handle case where user is not admin and auth is complete
+      // Toast and redirect is handled in useEffect, this is a fallback or to prevent rendering anything further
+      return null; 
+  }
+
 
   return (
     <div className="space-y-8">
@@ -60,7 +98,6 @@ export default function ManageFeedbackPage() {
             <CardTitle className="font-headline text-2xl flex items-center"><MessageSquare className="mr-2 h-6 w-6"/>Manage User Feedback</CardTitle>
             <CardDescription>Review and moderate user feedback from all projects.</CardDescription>
           </div>
-          {/* Add button for bulk actions or settings if needed later */}
         </CardHeader>
       </Card>
 
@@ -79,42 +116,49 @@ export default function ManageFeedbackPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {allFeedback.map((fb) => (
-                <TableRow key={fb.id}>
-                  <TableCell className="font-medium max-w-[150px] truncate" title={fb.projectTitle}>{fb.projectTitle}</TableCell>
-                  <TableCell className="max-w-[100px] truncate" title={fb.userName}>{fb.userName}</TableCell>
-                  <TableCell className="max-w-xs truncate" title={fb.comment}>{fb.comment}</TableCell>
-                  <TableCell>
-                    {fb.rating ? (
-                      <div className="flex items-center">
-                        {fb.rating} <Star className="ml-1 h-4 w-4 text-yellow-400 fill-yellow-400"/>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">N/A</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {fb.sentimentSummary ? <Badge variant="outline">{fb.sentimentSummary}</Badge> : <span className="text-muted-foreground">N/A</span>}
-                  </TableCell>
-                  <TableCell>{formatDistanceToNow(new Date(fb.createdAt), { addSuffix: true })}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                           <span className="sr-only">Feedback Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Full Feedback</DropdownMenuItem>
-                        <DropdownMenuItem>Mark as Reviewed</DropdownMenuItem>
-                        {/* Add more actions like 'Hide Comment' or 'Respond' if needed */}
-                        <DropdownMenuItem className="text-destructive">Delete Feedback</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+              {allFeedback.length === 0 && !isLoadingData ? (
+                 <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        No feedback found.
+                    </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                allFeedback.map((fb) => (
+                  <TableRow key={fb.id}>
+                    <TableCell className="font-medium max-w-[150px] truncate" title={fb.projectTitle}>{fb.projectTitle}</TableCell>
+                    <TableCell className="max-w-[100px] truncate" title={fb.user_name}>{fb.user_name}</TableCell>
+                    <TableCell className="max-w-xs truncate" title={fb.comment}>{fb.comment}</TableCell>
+                    <TableCell>
+                      {fb.rating ? (
+                        <div className="flex items-center">
+                          {fb.rating} <Star className="ml-1 h-4 w-4 text-yellow-400 fill-yellow-400"/>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {fb.sentiment_summary ? <Badge variant="outline">{fb.sentiment_summary}</Badge> : <span className="text-muted-foreground">N/A</span>}
+                    </TableCell>
+                    <TableCell>{formatDistanceToNow(new Date(fb.created_at), { addSuffix: true })}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                             <span className="sr-only">Feedback Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>View Full Feedback</DropdownMenuItem>
+                          <DropdownMenuItem>Mark as Reviewed</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">Delete Feedback</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -22,10 +22,10 @@ export interface Database {
           name: string | null
           email: string | null
           role: "user" | "admin" | null
-          avatar_url: string | null // Supabase often uses snake_case for columns
+          avatar_url: string | null 
         }
         Insert: {
-          id?: string // UUID, defaults to gen_random_uuid()
+          id?: string 
           created_at?: string
           name?: string | null
           email?: string | null
@@ -42,8 +42,115 @@ export interface Database {
         }
         Relationships: []
       }
-      // Define other tables here as you create them in Supabase
-      // e.g., projects, news_articles, services, feedback, videos
+      projects: {
+        Row: {
+          id: string // UUID
+          title: string
+          subtitle: string
+          ministry_id: string | null // We'll look this up in mock data for now
+          state_id: string | null    // We'll look this up in mock data for now
+          status: string // 'Ongoing' | 'Completed' | 'Planned' | 'On Hold'
+          start_date: string // ISO date string
+          expected_end_date: string | null // ISO date string
+          actual_end_date: string | null // ISO date string
+          description: string
+          images: Json | null // Array of { url: string; alt: string; dataAiHint?: string }
+          videos: Json | null // Array of Video type
+          impact_stats: Json | null // Array of ImpactStat type (with iconName)
+          budget: number | null
+          expenditure: number | null
+          tags: string[] | null // Array of text
+          last_updated_at: string // ISO date string
+          created_at: string // ISO date string
+        }
+        Insert: {
+          id?: string
+          title: string
+          subtitle: string
+          ministry_id?: string | null
+          state_id?: string | null
+          status: string
+          start_date: string
+          expected_end_date?: string | null
+          actual_end_date?: string | null
+          description: string
+          images?: Json | null
+          videos?: Json | null
+          impact_stats?: Json | null
+          budget?: number | null
+          expenditure?: number | null
+          tags?: string[] | null
+          last_updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          subtitle?: string
+          ministry_id?: string | null
+          state_id?: string | null
+          status?: string
+          start_date?: string
+          expected_end_date?: string | null
+          actual_end_date?: string | null
+          description?: string
+          images?: Json | null
+          videos?: Json | null
+          impact_stats?: Json | null
+          budget?: number | null
+          expenditure?: number | null
+          tags?: string[] | null
+          last_updated_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      feedback: {
+        Row: {
+          id: string // UUID
+          project_id: string // FK to projects.id
+          user_id: string | null // FK to users.id (optional for now)
+          user_name: string
+          comment: string
+          rating: number | null
+          sentiment_summary: string | null
+          created_at: string // ISO date string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id?: string | null
+          user_name: string
+          comment: string
+          rating?: number | null
+          sentiment_summary?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string | null
+          user_name?: string
+          comment?: string
+          rating?: number | null
+          sentiment_summary?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_user_id_fkey" // Assuming you have a users table
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -60,20 +167,16 @@ export interface Database {
   }
 }
 
-// Example of how you might map your existing types to Supabase table rows, if needed
-// This is more for reference as direct Supabase types (Database interface) are preferred.
 import type { User as AppUser } from './index';
-
 export type UserRow = Database['public']['Tables']['users']['Row'];
 
-// Function to map Supabase UserRow to your application's User type (if column names differ etc.)
 export function mapUserRowToAppUser(row: UserRow): AppUser {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     role: row.role,
-    avatarUrl: row.avatar_url, // snake_case to camelCase
+    avatarUrl: row.avatar_url, 
     created_at: row.created_at,
   };
 }

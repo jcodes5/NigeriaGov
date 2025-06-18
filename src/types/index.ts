@@ -1,4 +1,6 @@
 
+import type { Database } from "./supabase";
+
 export interface Ministry {
   id: string;
   name: string;
@@ -9,21 +11,19 @@ export interface State {
   name: string;
 }
 
-export interface Feedback {
-  id: string;
-  projectId: string;
-  userId?: string; 
-  userName: string;
-  comment: string;
-  rating?: number; 
-  sentimentSummary?: string;
-  createdAt: Date | string; // Adjusted to allow string for Supabase dates
-}
+// Corresponds to public.feedback table
+export type Feedback = Database['public']['Tables']['feedback']['Row'] & {
+  // Add any client-side transformations or additional properties if needed
+  // For example, if you resolve user_id to a full User object on client
+  user?: User; 
+};
+
 
 export interface ImpactStat {
   label: string;
   value: string;
-  icon?: React.ElementType; 
+  iconName?: string; // Store Lucide icon name
+  icon?: React.ElementType; // Resolved on client
 }
 
 export interface Video {
@@ -35,34 +35,38 @@ export interface Video {
   dataAiHint?: string;
 }
 
+// Represents the data structure after fetching from Supabase and 'joining' ministry/state names
 export interface Project {
-  id: string;
-  title: string;
-  subtitle: string;
-  ministry: Ministry; // This might need to be ministry_id: string and fetched separately or joined
-  state: State;     // This might need to be state_id: string and fetched separately or joined
-  status: 'Ongoing' | 'Completed' | 'Planned' | 'On Hold';
-  startDate: Date | string;
-  expectedEndDate?: Date | string;
-  actualEndDate?: Date | string;
-  description: string; 
-  images: { url: string; alt: string, dataAiHint?: string }[]; // JSONB or separate table
-  videos?: Video[]; // JSONB or separate table
-  impactStats: ImpactStat[]; // JSONB
-  budget?: number; 
-  expenditure?: number; 
-  tags?: string[]; // array of text
-  lastUpdatedAt: Date | string;
-  feedback?: Feedback[]; // Likely a separate table related by project_id
+  id: string; // from projects.id
+  title: string; // from projects.title
+  subtitle: string; // from projects.subtitle
+  ministry: Ministry; // Resolved from projects.ministry_id
+  state: State;     // Resolved from projects.state_id
+  status: 'Ongoing' | 'Completed' | 'Planned' | 'On Hold'; // from projects.status
+  startDate: string | Date; // from projects.start_date
+  expectedEndDate?: string | Date; // from projects.expected_end_date
+  actualEndDate?: string | Date; // from projects.actual_end_date
+  description: string; // from projects.description
+  images: { url: string; alt: string, dataAiHint?: string }[]; // from projects.images (JSONB)
+  videos?: Video[]; // from projects.videos (JSONB)
+  impactStats: ImpactStat[]; // from projects.impact_stats (JSONB, with iconName)
+  budget?: number; // from projects.budget
+  expenditure?: number; // from projects.expenditure
+  tags?: string[]; // from projects.tags (array of text)
+  lastUpdatedAt: string | Date; // from projects.last_updated_at
+  feedback?: Feedback[]; // Fetched separately from feedback table
+  // raw supabase row data
+  ministry_id?: string | null; 
+  state_id?: string | null; 
 }
 
+
 export interface User {
-  id: string; // Typically UUID from Supabase
+  id: string; 
   name: string | null;
   email: string | null;
   role: 'user' | 'admin' | null;
   avatarUrl?: string | null;
-  // Supabase might add other fields like created_at, updated_at
   created_at?: string; 
 }
 
@@ -83,8 +87,8 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  iconName?: string; // Store icon name, resolve to component on client
-  icon?: React.ElementType; // For client-side rendering
+  iconName?: string; 
+  icon?: React.ElementType; 
   link?: string; 
   category: string;
   imageUrl?: string;

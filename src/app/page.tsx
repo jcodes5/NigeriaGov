@@ -4,13 +4,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowRight, CheckCircle, Eye, Newspaper, Server, PlayCircle, Briefcase } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { mockNews, mockServices, projects as featuredProjectsData, mockFeaturedVideos } from "@/lib/data";
+import { mockNews, mockServices, getAllProjects, mockFeaturedVideos } from "@/lib/data";
 import { NewsCard } from "@/components/news/news-card";
 import { ServiceCard } from "@/components/services/service-card";
 import { VideoCard } from "@/components/common/video-card";
 
 // Take first 3 projects for featured section
-const featuredProjects = featuredProjectsData.slice(0, 3);
+const featuredProjects = getAllProjects().slice(0, 3);
 const latestNews = mockNews.slice(0, 3);
 const popularServices = mockServices.slice(0, 3);
 

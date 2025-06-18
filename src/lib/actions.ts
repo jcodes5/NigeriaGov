@@ -3,60 +3,53 @@
 
 import { revalidatePath } from 'next/cache';
 import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from '@/ai/flows/summarize-feedback-sentiment';
-import { addFeedbackToProject, getProjectById, deleteUserById as removeUserFromSupabase } from './data';
+import { addFeedbackToProject, deleteUserById as removeUserFromSupabase } from './data'; // Removed getProjectById as it's async now and logic will change
 import type { Feedback } from '@/types';
 
 export interface SubmitFeedbackResult {
   success: boolean;
   message: string;
-  feedback?: Feedback;
+  feedback?: Feedback; // This will be the Feedback object returned from Supabase
   sentimentSummary?: string;
 }
 
 export async function submitProjectFeedback(
   projectId: string,
-  formData: { userName: string; comment: string; rating?: number }
+  formData: { userName: string; comment: string; rating?: number; userId?: string; } // Added userId
 ): Promise<SubmitFeedbackResult> {
   try {
-    // 1. Save feedback (mock saving for now, will be Supabase call)
-    const newFeedbackData: Omit<Feedback, 'id' | 'createdAt' | 'projectId'> = {
-      userName: formData.userName,
-      comment: formData.comment,
-      rating: formData.rating,
-    };
-    
-    // TODO: Replace with Supabase insert for feedback
-    const savedFeedback = addFeedbackToProject(projectId, newFeedbackData);
-
-    if (!savedFeedback) {
-      return { success: false, message: "Failed to save feedback." };
-    }
-
-    // 2. Get sentiment summary using GenAI flow
+    // 1. Get sentiment summary using GenAI flow FIRST (optional, could be after saving)
     const sentimentInput: SummarizeFeedbackSentimentInput = {
       feedback: formData.comment,
     };
     const sentimentOutput = await summarizeFeedbackSentiment(sentimentInput);
     
-    savedFeedback.sentimentSummary = sentimentOutput.sentimentSummary;
+    // 2. Prepare feedback data for Supabase
+    const feedbackToSave = {
+      userName: formData.userName,
+      comment: formData.comment,
+      rating: formData.rating,
+      sentimentSummary: sentimentOutput.sentimentSummary,
+      userId: formData.userId, // Include if available
+    };
 
-    // TODO: Update the feedback record in Supabase with sentimentSummary
-    const project = getProjectById(projectId); // This will also need to become async if projects are from Supabase
-    if (project && project.feedback) {
-        const feedbackIndex = project.feedback.findIndex(f => f.id === savedFeedback.id);
-        if (feedbackIndex !== -1) {
-            project.feedback[feedbackIndex].sentimentSummary = sentimentOutput.sentimentSummary;
-        }
+    // 3. Save feedback to Supabase
+    const savedFeedback = await addFeedbackToProject(projectId, feedbackToSave);
+
+    if (!savedFeedback) {
+      return { success: false, message: "Failed to save feedback to the database." };
     }
 
-    revalidatePath(`/projects/${projectId}`);
-    revalidatePath('/projects');
-    revalidatePath('/dashboard/admin/manage-feedback');
+    // 4. Revalidate paths
+    revalidatePath(`/projects/${projectId}`); // Revalidate the specific project page
+    // Consider revalidating other paths if feedback lists are displayed elsewhere broadly
+    revalidatePath('/dashboard/admin/manage-feedback'); 
+    revalidatePath(`/dashboard/user/feedback`); // If user feedback page exists
 
     return {
       success: true,
       message: 'Feedback submitted successfully!',
-      feedback: savedFeedback,
+      feedback: savedFeedback, // Return the feedback object from Supabase
       sentimentSummary: sentimentOutput.sentimentSummary,
     };
 
@@ -77,10 +70,9 @@ export interface DeleteUserResult {
 
 export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   try {
-    // Prevent deleting the main admin user for demo purposes if still using mock auth ID "admin1"
-    // This check might need adjustment if Supabase auth is fully integrated
+    // This check is fine as is, assuming user IDs like "admin1" are not UUIDs from Supabase
     if (userId === "admin1") { 
-      return { success: false, message: "Cannot delete the primary admin account (mock)." };
+      return { success: false, message: "Cannot delete the primary mock admin account." };
     }
 
     const { success, error } = await removeUserFromSupabase(userId);

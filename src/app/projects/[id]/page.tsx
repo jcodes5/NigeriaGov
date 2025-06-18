@@ -1,58 +1,91 @@
 
 "use client"
 
-import { useEffect, useState, use } from 'react'; // Added React.use
+import { useEffect, useState } from 'react'; 
 import { getProjectById } from '@/lib/data'; 
-import type { Project } from '@/types';
+import type { Project, Feedback as FeedbackType } from '@/types'; // Renamed Feedback to FeedbackType
 import { ImageGallery } from '@/components/projects/image-gallery';
 import { FeedbackForm } from '@/components/projects/feedback-form';
 import { FeedbackList } from '@/components/projects/feedback-list';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { notFound } from 'next/navigation';
-import { CalendarDays, MapPin, Briefcase, DollarSign, Info, Users, MessageSquare, ThumbsUp, TrendingUp, PlayCircle } from 'lucide-react';
+import { notFound, useParams } from 'next/navigation'; // Use useParams for client components
+import { CalendarDays, MapPin, Briefcase, DollarSign, Info, Users, MessageSquare, ThumbsUp, TrendingUp, PlayCircle, Construction, PersonStanding, Flag, CheckCircle, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { VideoCard } from '@/components/common/video-card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
-export default function ProjectDetailPage({ params: paramsProp }: { params: { id: string } }) {
-  const params = use(paramsProp); // Unwrap params using React.use()
-  const { id } = params; // Destructure id from unwrapped params
+export default function ProjectDetailPage() {
+  const params = useParams(); // Get params using hook
+  const id = params.id as string; // Assuming id is always a string
 
-  const [project, setProject] = useState<Project | null | undefined>(undefined); 
+  const [project, setProject] = useState<Project | null>(null); 
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const refreshFeedback = () => {
-    const updatedProject = getProjectById(id); 
-    if (updatedProject) {
-      setProject(updatedProject);
+  const fetchProjectData = async () => {
+    if (!id) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const fetchedProject = await getProjectById(id);
+      if (fetchedProject) {
+        setProject(fetchedProject);
+      } else {
+        notFound(); // Or set an error state
+      }
+    } catch (err) {
+      console.error("Failed to fetch project:", err);
+      setError("Failed to load project data. Please try again later.");
+      // notFound(); // Or handle error differently
+    } finally {
+      setIsLoading(false);
     }
   };
   
   useEffect(() => {
-    const fetchedProject = getProjectById(id); 
-    setProject(fetchedProject);
+    fetchProjectData();
   }, [id]); 
 
-  if (project === undefined) { 
+  const refreshFeedback = () => {
+    // Re-fetch the whole project to get updated feedback
+    fetchProjectData(); 
+  };
+
+  if (isLoading) { 
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-10 bg-muted rounded w-3/4"></div>
-          <div className="h-6 bg-muted rounded w-1/2"></div>
-          <div className="h-64 bg-muted rounded"></div>
-          <div className="space-y-2">
-            <div className="h-4 bg-muted rounded"></div>
-            <div className="h-4 bg-muted rounded w-5/6"></div>
-            <div className="h-4 bg-muted rounded w-4/6"></div>
+      <div className="container mx-auto px-4 py-8 space-y-10">
+        <Skeleton className="h-12 w-3/4 mb-2" />
+        <Skeleton className="h-6 w-1/2 mb-4" />
+        <div className="flex flex-wrap gap-2 items-center text-sm text-muted-foreground mb-6">
+          <Skeleton className="h-8 w-20" /> <Skeleton className="h-6 w-px" />
+          <Skeleton className="h-6 w-32" /> <Skeleton className="h-6 w-px" />
+          <Skeleton className="h-6 w-24" /> <Skeleton className="h-6 w-px" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <Card><CardHeader><Skeleton className="h-8 w-1/3 mb-2" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-8 w-1/3 mb-2" /></CardHeader><CardContent><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6 mb-2" /><Skeleton className="h-4 w-4/6" /></CardContent></Card>
+          </div>
+          <div className="space-y-8">
+            <Card><CardHeader><Skeleton className="h-8 w-1/2 mb-2" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-full" /></CardContent></Card>
           </div>
         </div>
       </div>
     );
   }
 
+  if (error) {
+    return <div className="container mx-auto px-4 py-8 text-center text-destructive">{error}</div>;
+  }
+  
   if (!project) {
-    notFound();
+    // This case should ideally be handled by notFound() in fetchProjectData,
+    // but as a fallback:
+    return notFound(); 
   }
   
   const statusColors: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -60,6 +93,10 @@ export default function ProjectDetailPage({ params: paramsProp }: { params: { id
     Completed: 'default',
     Planned: 'outline',
     'On Hold': 'destructive',
+  };
+
+  const iconMap: { [key: string]: React.ElementType } = {
+    Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, Construction, PersonStanding, CheckCircle, Zap
   };
 
   return (
@@ -154,13 +191,16 @@ export default function ProjectDetailPage({ params: paramsProp }: { params: { id
                 <CardTitle className="font-headline flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-primary" /> Impact Statistics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {project.impactStats.map((stat, index) => (
-                  <div key={index} className="flex items-center text-sm">
-                    {stat.icon ? <stat.icon className="h-5 w-5 mr-3 text-primary/80" /> : <ThumbsUp className="h-5 w-5 mr-3 text-primary/80" />}
-                    <span className="flex-1">{stat.label}:</span>
-                    <strong className="text-primary">{stat.value}</strong>
-                  </div>
-                ))}
+                {project.impactStats.map((stat, index) => {
+                  const IconComponent = stat.iconName ? iconMap[stat.iconName] || ThumbsUp : ThumbsUp;
+                  return (
+                    <div key={index} className="flex items-center text-sm">
+                      <IconComponent className="h-5 w-5 mr-3 text-primary/80" />
+                      <span className="flex-1">{stat.label}:</span>
+                      <strong className="text-primary">{stat.value}</strong>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -193,4 +233,3 @@ export default function ProjectDetailPage({ params: paramsProp }: { params: { id
     </div>
   );
 }
-
