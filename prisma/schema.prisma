@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String     @id @default(uuid())
+  created_at  DateTime?  @default(now()) @map("created_at")
+  name        String?
+  email       String?    @unique
+  role        String? // Consider using an Enum: enum Role { USER ADMIN }
+  avatar_url  String?    @map("avatar_url")
+  feedback    Feedback[]
+
+  @@map("users")
+}
+
+model Project {
+  id                 String     @id @default(uuid())
+  title              String
+  subtitle           String
+  ministry_id        String?    @map("ministry_id") // Will be text for now, referencing mock data IDs
+  state_id           String?    @map("state_id")    // Will be text for now, referencing mock data IDs
+  status             String     // e.g., 'Ongoing', 'Completed', 'Planned', 'On Hold'
+  start_date         DateTime   @map("start_date")
+  expected_end_date  DateTime?  @map("expected_end_date")
+  actual_end_date    DateTime?  @map("actual_end_date")
+  description        String
+  images             Json?      // Expected: { url: string; alt: string; dataAiHint?: string }[]
+  videos             Json?      // Expected: { id: string; title: string; url: string; thumbnailUrl?: string; description?: string; dataAiHint?: string }[]
+  impact_stats       Json?      @map("impact_stats") // Expected: { label: string; value: string; iconName?: string }[]
+  budget             Float?
+  expenditure        Float?
+  tags               String[]   @default([])
+  last_updated_at    DateTime   @updatedAt @map("last_updated_at")
+  created_at         DateTime   @default(now()) @map("created_at")
+  feedback_list      Feedback[] @relation("ProjectFeedback")
+
+  @@map("projects")
+}
+
+model Feedback {
+  id                 String    @id @default(uuid())
+  project_id         String    @map("project_id")
+  user_id            String?   @map("user_id")
+  user_name          String    @map("user_name")
+  comment            String
+  rating             Int?
+  sentiment_summary  String?   @map("sentiment_summary")
+  created_at         DateTime  @default(now()) @map("created_at")
+
+  project Project? @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@map("feedback")
+}

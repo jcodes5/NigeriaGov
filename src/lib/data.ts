@@ -1,10 +1,11 @@
 
-import type { Ministry, State, Project, Feedback, ImpactStat, NewsArticle, ServiceItem, Video, User } from '@/types';
+import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser } from '@/types';
 import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle, PersonStanding, Construction, CheckCircle, Zap } from 'lucide-react';
-import { supabase } from './supabaseClient';
-import type { Database } from '@/types/supabase';
+import prisma from './prisma'; // Import Prisma client
+import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser } from '@prisma/client';
 
-// --- Mock Data for Ministries and States (until they are moved to Supabase) ---
+
+// --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
   { id: 'm1', name: 'Federal Ministry of Works and Housing' },
   { id: 'm2', name: 'Federal Ministry of Finance, Budget and National Planning' },
@@ -27,19 +28,17 @@ export const states: State[] = [
 // --- End Mock Data ---
 
 
-// --- Project Data Functions (Supabase Integrated) ---
+// --- Helper function to map Prisma Project to AppProject ---
+const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_list?: PrismaFeedback[] }): AppProject => {
+  const ministry = ministries.find(m => m.id === prismaProject.ministry_id) || { id: prismaProject.ministry_id || 'unknown_ministry', name: 'Unknown Ministry' };
+  const state = states.find(s => s.id === prismaProject.state_id) || { id: prismaProject.state_id || 'unknown_state', name: 'Unknown State' };
 
-// Helper to map Supabase project row to our Project type, including resolving ministry/state names
-const mapProjectRowToProject = (row: Database['public']['Tables']['projects']['Row']): Project => {
-  const ministry = ministries.find(m => m.id === row.ministry_id) || { id: row.ministry_id || 'unknown', name: 'Unknown Ministry' };
-  const state = states.find(s => s.id === row.state_id) || { id: row.state_id || 'unknown', name: 'Unknown State' };
-  
-  // Map iconName to actual Lucide icon components for impactStats
-  const mappedImpactStats = (row.impact_stats as ImpactStat[] || []).map(stat => {
+  const mappedImpactStats = (prismaProject.impact_stats as unknown as ImpactStat[] || []).map(stat => {
     let iconComponent;
     switch (stat.iconName) {
       case 'Briefcase': iconComponent = Briefcase; break;
       case 'Users': iconComponent = Users; break;
+      // ... (add all other icon mappings as before) ...
       case 'DollarSign': iconComponent = DollarSign; break;
       case 'TrendingUp': iconComponent = TrendingUp; break;
       case 'MapPin': iconComponent = MapPin; break;
@@ -49,71 +48,85 @@ const mapProjectRowToProject = (row: Database['public']['Tables']['projects']['R
       case 'Construction': iconComponent = Construction; break;
       case 'CheckCircle': iconComponent = CheckCircle; break;
       case 'Zap': iconComponent = Zap; break;
-      default: iconComponent = TrendingUp; // Default icon
+      default: iconComponent = TrendingUp;
     }
     return { ...stat, icon: iconComponent };
   });
 
   return {
-    id: row.id,
-    title: row.title,
-    subtitle: row.subtitle,
+    id: prismaProject.id,
+    title: prismaProject.title,
+    subtitle: prismaProject.subtitle,
     ministry,
     state,
-    status: row.status as Project['status'],
-    startDate: row.start_date,
-    expectedEndDate: row.expected_end_date || undefined,
-    actualEndDate: row.actual_end_date || undefined,
-    description: row.description,
-    images: (row.images as { url: string; alt: string, dataAiHint?: string }[] || []),
-    videos: (row.videos as Video[] || []),
+    status: prismaProject.status as AppProject['status'],
+    startDate: prismaProject.start_date,
+    expectedEndDate: prismaProject.expected_end_date || undefined,
+    actualEndDate: prismaProject.actual_end_date || undefined,
+    description: prismaProject.description,
+    images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
+    videos: (prismaProject.videos as unknown as Video[] || []),
     impactStats: mappedImpactStats,
-    budget: row.budget || undefined,
-    expenditure: row.expenditure || undefined,
-    tags: (row.tags as string[] || []),
-    lastUpdatedAt: row.last_updated_at,
-    ministry_id: row.ministry_id,
-    state_id: row.state_id,
-    // Feedback will be fetched separately
+    budget: prismaProject.budget || undefined,
+    expenditure: prismaProject.expenditure || undefined,
+    tags: prismaProject.tags || [],
+    lastUpdatedAt: prismaProject.last_updated_at,
+    feedback: prismaProject.feedback_list?.map(mapPrismaFeedbackToAppFeedback) || [],
+    ministry_id: prismaProject.ministry_id,
+    state_id: prismaProject.state_id,
+  };
+};
+
+// --- Helper function to map Prisma Feedback to AppFeedback ---
+const mapPrismaFeedbackToAppFeedback = (prismaFeedback: PrismaFeedback): AppFeedback => {
+  return {
+    id: prismaFeedback.id,
+    project_id: prismaFeedback.project_id,
+    user_id: prismaFeedback.user_id,
+    user_name: prismaFeedback.user_name,
+    comment: prismaFeedback.comment,
+    rating: prismaFeedback.rating,
+    sentiment_summary: prismaFeedback.sentiment_summary,
+    created_at: prismaFeedback.created_at.toISOString(), // Ensure it's string
+  };
+};
+
+// --- Helper function to map Prisma User to AppUser ---
+const mapPrismaUserToAppUser = (prismaUser: PrismaUser): AppUser => {
+  return {
+    id: prismaUser.id,
+    name: prismaUser.name,
+    email: prismaUser.email,
+    role: prismaUser.role as AppUser['role'] | null, // Prisma returns string?, AppUser expects 'user'|'admin'|null
+    avatarUrl: prismaUser.avatar_url,
+    created_at: prismaUser.created_at?.toISOString(),
   };
 };
 
 
-export const getProjectById = async (id: string): Promise<Project | null> => {
-  const { data: projectRow, error: projectError } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', id)
-    .single();
+// --- Project Data Functions (Prisma Integrated) ---
+export const getProjectById = async (id: string): Promise<AppProject | null> => {
+  try {
+    const projectWithFeedback = await prisma.project.findUnique({
+      where: { id },
+      include: {
+        feedback_list: { // Relation name from Prisma schema
+          orderBy: { created_at: 'desc' },
+        },
+      },
+    });
 
-  if (projectError) {
-    console.error('Error fetching project by ID:', projectError);
+    if (!projectWithFeedback) return null;
+    return mapPrismaProjectToAppProject(projectWithFeedback);
+  } catch (error) {
+    console.error('Error fetching project by ID with Prisma:', error);
     return null;
   }
-  if (!projectRow) return null;
-
-  const project = mapProjectRowToProject(projectRow);
-
-  // Fetch related feedback
-  const { data: feedbackRows, error: feedbackError } = await supabase
-    .from('feedback')
-    .select('*')
-    .eq('project_id', id)
-    .order('created_at', { ascending: false });
-
-  if (feedbackError) {
-    console.error('Error fetching feedback for project:', feedbackError);
-    // Continue with project data even if feedback fails, but log it
-  }
-  
-  project.feedback = (feedbackRows as Feedback[] || []);
-  
-  return project;
 };
 
-export const getAllProjects = (filters?: { ministryId?: string; stateId?: string; status?: string; startDate?: Date }): Project[] => {
-  // TODO: Migrate this to Supabase. For now, returning mock data for other list pages.
-  console.warn("getAllProjects is still using mock data. Needs Supabase migration.");
+export const getAllProjects = (filters?: { ministryId?: string; stateId?: string; status?: string; startDate?: Date }): AppProject[] => {
+  // TODO: Migrate this to Prisma with actual filtering. For now, returning mock data.
+  console.warn("getAllProjects is still using mock data for listing. Needs Prisma migration for filtering.");
   let filteredProjects = MOCK_PROJECTS_TEMP; // Using temporary mock projects
   if (filters?.ministryId) {
     filteredProjects = filteredProjects.filter(p => p.ministry.id === filters.ministryId);
@@ -128,90 +141,78 @@ export const getAllProjects = (filters?: { ministryId?: string; stateId?: string
 };
 
 
-// --- Feedback Data Functions (Supabase Integrated) ---
+// --- Feedback Data Functions (Prisma Integrated) ---
 export const addFeedbackToProject = async (
   projectId: string,
-  feedbackData: Omit<Feedback, 'id' | 'created_at' | 'project_id'> & { userId?: string } // userId is optional
-): Promise<Feedback | null> => {
-  const { data, error } = await supabase
-    .from('feedback')
-    .insert([{ 
-      project_id: projectId, 
-      user_name: feedbackData.userName,
-      comment: feedbackData.comment,
-      rating: feedbackData.rating,
-      sentiment_summary: feedbackData.sentimentSummary, // This will come from Genkit
-      user_id: feedbackData.userId, // Pass if available
-      // created_at will be set by Supabase (default now())
-    }])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding feedback to Supabase:', error);
+  feedbackData: Omit<AppFeedback, 'id' | 'created_at' | 'project_id'> & { userId?: string | null }
+): Promise<AppFeedback | null> => {
+  try {
+    const savedFeedback = await prisma.feedback.create({
+      data: {
+        project_id: projectId,
+        user_name: feedbackData.userName,
+        comment: feedbackData.comment,
+        rating: feedbackData.rating,
+        sentiment_summary: feedbackData.sentimentSummary,
+        user_id: feedbackData.userId || null, // Prisma expects null for optional relations if not provided
+      },
+    });
+    return mapPrismaFeedbackToAppFeedback(savedFeedback);
+  } catch (error) {
+    console.error('Error adding feedback to project with Prisma:', error);
     return null;
   }
-  return data as Feedback;
 };
 
-export const getAllFeedbackWithProjectTitles = async (): Promise<Array<Feedback & { projectTitle: string }>> => {
-  const { data: feedbackRows, error: feedbackError } = await supabase
-    .from('feedback')
-    .select(`
-      *,
-      projects (
-        title
-      )
-    `)
-    .order('created_at', { ascending: false });
+export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedback & { projectTitle: string }>> => {
+  try {
+    const feedbackWithProjects = await prisma.feedback.findMany({
+      include: {
+        project: { // Relation name for project
+          select: { title: true },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
 
-  if (feedbackError) {
-    console.error('Error fetching all feedback:', feedbackError);
+    return feedbackWithProjects.map(fb => ({
+      ...mapPrismaFeedbackToAppFeedback(fb),
+      projectTitle: fb.project?.title || 'Unknown Project',
+    }));
+  } catch (error) {
+    console.error('Error fetching all feedback with project titles using Prisma:', error);
     return [];
   }
-
-  return feedbackRows.map(fb_row => {
-    const fb = fb_row as any; // Cast to access joined project
-    return {
-      ...fb,
-      project_id: fb.project_id, // ensure project_id is correctly assigned
-      projectTitle: fb.projects?.title || 'Unknown Project',
-      // created_at: new Date(fb.created_at), // Ensure dates are Date objects if needed client-side
-    } as Feedback & { projectTitle: string };
-  });
 };
 
 
-// --- User Management Functions (Supabase Integrated) ---
-export async function getUsers(): Promise<User[]> {
-  const { data, error } = await supabase.from('users').select('*');
-  if (error) {
-    console.error('Error fetching users:', error);
-    return []; 
+// --- User Management Functions (Prisma Integrated) ---
+export async function getUsers(): Promise<AppUser[]> {
+  try {
+    const users = await prisma.user.findMany();
+    return users.map(mapPrismaUserToAppUser);
+  } catch (error) {
+    console.error('Error fetching users with Prisma:', error);
+    return [];
   }
-  return (data || []).map(row => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: row.role as User['role'],
-      avatarUrl: row.avatar_url,
-      created_at: row.created_at,
-  }));
 }
 
 export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
-  const { error } = await supabase.from('users').delete().eq('id', userId);
-  if (error) {
-    console.error('Error deleting user from Supabase:', error);
+  try {
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting user with Prisma:', error);
     return { success: false, error };
   }
-  return { success: true };
 }
 
 
 // --- Mock Data (to be phased out) ---
-const generateMockFeedback = (projectId: string, count: number): Feedback[] => {
-  const feedbackList: Feedback[] = [];
+const generateMockFeedback = (projectId: string, count: number): AppFeedback[] => {
+  const feedbackList: AppFeedback[] = [];
   const users = ['Aisha Bello', 'Chinedu Okafor', 'Yemi Adebayo', 'Fatima Sani'];
   const comments = [
     "This is a great initiative, keep up the good work!",
@@ -223,19 +224,19 @@ const generateMockFeedback = (projectId: string, count: number): Feedback[] => {
   for (let i = 0; i < count; i++) {
     feedbackList.push({
       id: `f${projectId}-${i + 1}`,
-      project_id: projectId, // Corrected from projectId
+      project_id: projectId,
       user_name: users[i % users.length],
       comment: comments[i % comments.length],
-      rating: Math.floor(Math.random() * 3) + 3, 
+      rating: Math.floor(Math.random() * 3) + 3,
       created_at: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 30).toISOString(),
       sentiment_summary: Math.random() > 0.5 ? 'Positive' : 'Mixed',
-      user_id: null, // Explicitly set user_id
+      user_id: null,
     });
   }
   return feedbackList;
 };
 
-const MOCK_PROJECTS_TEMP: Project[] = [
+const MOCK_PROJECTS_TEMP: AppProject[] = [
   {
     id: 'p1-mock',
     title: 'Mock: Lagos-Ibadan Expressway Rehab',
@@ -248,8 +249,8 @@ const MOCK_PROJECTS_TEMP: Project[] = [
     description: `<p>Mock data for Lagos-Ibadan Expressway.</p>`,
     images: [ { url: 'https://placehold.co/800x600.png', alt: 'Mock road construction', dataAiHint: 'road construction' } ],
     impactStats: [ { label: "Jobs Created", value: "1,200+", iconName: "Briefcase" } ],
-    budget: 310000000000, 
-    lastUpdatedAt: new Date().toISOString(), 
+    budget: 310000000000,
+    lastUpdatedAt: new Date().toISOString(),
     feedback: generateMockFeedback('p1-mock', 2),
   },
 ];
@@ -277,7 +278,7 @@ export const mockServices: ServiceItem[] = [
     summary: 'Access the portal to apply for or renew your Nigerian international passport.',
     icon: Plane,
     category: 'Immigration',
-    link: '#', 
+    link: '#',
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'passport document',
   },
@@ -288,19 +289,27 @@ export const mockFeaturedVideos: Video[] = [
 ];
 
 
-// --- News & Services (Still using mock data, to be migrated) ---
+// --- News & Services (Still using mock data, to be migrated to Prisma) ---
 export const getNewsArticleBySlug = (slug: string): NewsArticle | undefined => {
+  // TODO: Migrate to Prisma
+  console.warn("getNewsArticleBySlug is using mock data.");
   return mockNews.find(article => article.slug === slug);
 };
 
 export const getAllNewsArticles = (): NewsArticle[] => {
+  // TODO: Migrate to Prisma
+  console.warn("getAllNewsArticles is using mock data.");
   return mockNews.sort((a,b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
 };
 
 export const getAllServices = (): ServiceItem[] => {
+  // TODO: Migrate to Prisma
+  console.warn("getAllServices is using mock data.");
   return mockServices;
 };
 
 export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
+  // TODO: Migrate to Prisma
+  console.warn("getServiceBySlug is using mock data.");
   return mockServices.find(service => service.slug === slug);
 };
