@@ -1,49 +1,84 @@
 
-"use client";
+"use client"; // Temporarily keep as client component due to Image component and potential auth interaction complexity for full server conversion
 
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, FileText, BarChart3, ShieldAlert, Settings, Newspaper, Server, MessageSquare, PlayCircleIcon } from "lucide-react";
+import { Users, FileText, BarChart3, ShieldAlert, Settings, Newspaper, Server, MessageSquare, PlayCircleIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { useToast } from "@/hooks/use-toast"; 
+import { useToast } from "@/hooks/use-toast";
+import { fetchAdminDashboardStats } from "@/lib/actions"; // Import the server action
+
+interface DashboardStats {
+  totalProjects: number;
+  totalUsers: number;
+  totalNewsArticles: number;
+  totalServices: number;
+  totalVideos: number;
+}
 
 export default function AdminDashboardPage() {
-  const { profile, isAdmin, isLoading } = useAuth(); // Using profile from AuthContext
+  const { profile, isAdmin, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const { toast } = useToast(); 
+  const { toast } = useToast();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
-    if (!isLoading && !isAdmin) { // Check isAdmin after loading is complete
-      toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-      router.replace("/dashboard/user"); 
+    if (!authLoading) {
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+      } else {
+        // Fetch stats if admin
+        const loadStats = async () => {
+          setIsLoadingStats(true);
+          try {
+            const fetchedStats = await fetchAdminDashboardStats();
+            setStats(fetchedStats);
+          } catch (error) {
+            console.error("Failed to fetch admin dashboard stats:", error);
+            toast({ title: "Error", description: "Could not load dashboard statistics.", variant: "destructive"});
+            setStats({ // Fallback mock stats on error
+              totalProjects: 0,
+              totalUsers: 0,
+              totalNewsArticles: 0,
+              totalServices: 0,
+              totalVideos: 0,
+            });
+          } finally {
+            setIsLoadingStats(false);
+          }
+        };
+        loadStats();
+      }
     }
-  }, [profile, isAdmin, isLoading, router, toast]); // Add profile to dependency array
+  }, [profile, isAdmin, authLoading, router, toast]);
 
-  if (isLoading || !isAdmin) { // Show loader if still loading or if not admin (even if profile is loaded)
+  if (authLoading || (isAdmin && isLoadingStats)) {
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">Verifying admin access...</p>
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">
+          {authLoading ? "Verifying admin access..." : "Loading dashboard data..."}
+        </p>
       </div>
     );
   }
+
+  if (!isAdmin && !authLoading) {
+    return null; // Render nothing if redirecting
+  }
   
-  // At this point, isLoading is false and isAdmin is true, so profile should exist
   const adminName = profile?.name || 'Admin';
   const adminAvatarName = profile?.name || profile?.email?.split('@')[0] || 'Admin';
 
-
-  const totalProjects = 150; // Mock data
-  const pendingApprovals = 5; // Mock data
-  const totalUsers = 1250; // Mock data
-  const siteHealth = "Good"; // Mock data
-  const totalNewsArticles = 25; // Mock data
-  const totalServices = 12; // Mock data
-  const totalVideos = 6; // Mock data for videos
+  // Mock data for items not yet fetched from DB
+  const pendingApprovals = 5; 
+  const siteHealth = "Good"; 
 
   return (
     <div className="space-y-8">
@@ -72,7 +107,7 @@ export default function AdminDashboardPage() {
             <BarChart3 className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProjects}</div>
+            <div className="text-2xl font-bold">{stats?.totalProjects ?? <Loader2 className="h-6 w-6 animate-spin" />}</div>
           </CardContent>
         </Card>
          <Card className="card-hover shadow-md">
@@ -81,7 +116,7 @@ export default function AdminDashboardPage() {
             <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
+            <div className="text-2xl font-bold">{stats?.totalUsers ?? <Loader2 className="h-6 w-6 animate-spin" />}</div>
           </CardContent>
         </Card>
         <Card className="card-hover shadow-md">
@@ -90,7 +125,7 @@ export default function AdminDashboardPage() {
             <Newspaper className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalNewsArticles}</div>
+            <div className="text-2xl font-bold">{stats?.totalNewsArticles ?? <Loader2 className="h-6 w-6 animate-spin" />}</div>
           </CardContent>
         </Card>
         <Card className="card-hover shadow-md">
@@ -99,7 +134,7 @@ export default function AdminDashboardPage() {
             <Server className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalServices}</div>
+            <div className="text-2xl font-bold">{stats?.totalServices ?? <Loader2 className="h-6 w-6 animate-spin" />}</div>
           </CardContent>
         </Card>
         <Card className="card-hover shadow-md">
@@ -108,7 +143,7 @@ export default function AdminDashboardPage() {
             <PlayCircleIcon className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalVideos}</div>
+            <div className="text-2xl font-bold">{stats?.totalVideos ?? <Loader2 className="h-6 w-6 animate-spin" />}</div>
           </CardContent>
         </Card>
          <Card className="card-hover shadow-md">
@@ -204,3 +239,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    

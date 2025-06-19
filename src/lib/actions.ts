@@ -25,8 +25,11 @@ import {
   type VideoCreationData,
   updateVideoInDb,
   deleteVideoFromDb,
+  getSiteSettingsFromDb,
+  updateSiteSettingsInDb,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData, SiteSettings } from '@/types';
+import type { SiteSettingsFormData } from '@/app/dashboard/admin/site-settings/page';
 import prisma from './prisma';
 
 
@@ -541,3 +544,65 @@ export async function deleteVideo(id: string): Promise<ActionResult> {
     return { success: false, message: 'An unexpected error occurred while deleting the video.', errorDetails: error instanceof Error ? error.stack : undefined };
   }
 }
+
+// --- Admin Dashboard Stats ---
+export async function fetchAdminDashboardStats() {
+  try {
+    const totalProjects = await prisma.project.count();
+    const totalUsers = await prisma.user.count();
+    const totalNewsArticles = await prisma.newsArticle.count();
+    const totalServices = await prisma.service.count();
+    const totalVideos = await prisma.video.count();
+    return { totalProjects, totalUsers, totalNewsArticles, totalServices, totalVideos };
+  } catch (error) {
+    console.error("Error fetching admin dashboard stats:", error);
+    throw new Error("Failed to load dashboard statistics.");
+  }
+}
+
+// --- Site Settings Actions ---
+interface SiteSettingsResult extends ActionResult {
+  settings?: SiteSettings | null;
+}
+
+export async function fetchSiteSettingsAction(): Promise<SiteSettings | null> {
+  try {
+    return await getSiteSettingsFromDb();
+  } catch (error) {
+    console.error("Error fetching site settings via action:", error);
+    // Depending on how critical this is, you might throw or return null/default
+    return null; 
+  }
+}
+
+export async function updateSiteSettingsAction(
+  formData: SiteSettingsFormData
+): Promise<SiteSettingsResult> {
+  try {
+    const settingsToSave: Partial<SiteSettings> = {
+      siteName: formData.siteName,
+      maintenanceMode: formData.maintenanceMode,
+      contactEmail: formData.contactEmail,
+      footerMessage: formData.footerMessage,
+    };
+    const updatedSettings = await updateSiteSettingsInDb(settingsToSave);
+    if (!updatedSettings) {
+      return { success: false, message: 'Failed to save site settings to the database.' };
+    }
+    // Revalidate paths that might display this info, e.g., footer in layout, contact page
+    revalidatePath('/'); // Broad revalidation for layout changes
+    revalidatePath('/contact');
+    revalidatePath('/dashboard/admin/site-settings');
+
+    return { success: true, message: 'Site settings updated successfully!', settings: updatedSettings };
+  } catch (error) {
+    console.error('Error updating site settings via action:', error);
+    return { 
+      success: false, 
+      message: 'An unexpected error occurred while saving site settings.', 
+      errorDetails: error instanceof Error ? error.stack : undefined 
+    };
+  }
+}
+
+    

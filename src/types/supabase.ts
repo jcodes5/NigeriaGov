@@ -235,7 +235,7 @@ export interface Database {
         }
         Relationships: []
       }
-      videos: { // Added Video table definition
+      videos: { 
         Row: {
           id: string
           title: string
@@ -243,8 +243,8 @@ export interface Database {
           thumbnail_url: string | null
           data_ai_hint: string | null
           description: string | null
-          created_at: string // timestamptz
-          updated_at: string // timestamptz
+          created_at: string 
+          updated_at: string 
         }
         Insert: {
           id?: string
@@ -265,6 +265,33 @@ export interface Database {
           description?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      site_settings: {
+        Row: {
+          id: string
+          siteName: string | null
+          maintenanceMode: boolean
+          contactEmail: string | null
+          footerMessage: string | null
+          updatedAt: string 
+        }
+        Insert: {
+          id: string
+          siteName?: string | null
+          maintenanceMode?: boolean
+          contactEmail?: string | null
+          footerMessage?: string | null
+          updatedAt?: string
+        }
+        Update: {
+          id?: string
+          siteName?: string | null
+          maintenanceMode?: boolean
+          contactEmail?: string | null
+          footerMessage?: string | null
+          updatedAt?: string
         }
         Relationships: []
       }
@@ -297,3 +324,5 @@ export function mapUserRowToAppUser(row: UserRow): AppUser {
     created_at: row.created_at,
   };
 }
+
+    

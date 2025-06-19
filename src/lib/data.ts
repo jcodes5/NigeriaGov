@@ -1,8 +1,8 @@
 
-import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video as AppVideo, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, ProjectFormData } from '@/types';
+import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video as AppVideo, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, ProjectFormData, SiteSettings } from '@/types';
 import * as LucideIcons from 'lucide-react';
 import prisma from './prisma';
-import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo } from '@prisma/client';
+import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo, SiteSetting as PrismaSiteSetting } from '@prisma/client';
 
 // --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
@@ -140,6 +140,17 @@ const mapPrismaVideoToAppVideo = (prismaVideo: PrismaVideo): AppVideo => {
   };
 };
 
+const mapPrismaSiteSettingToAppSiteSetting = (prismaSetting: PrismaSiteSetting): SiteSettings => {
+  return {
+    id: prismaSetting.id,
+    siteName: prismaSetting.siteName,
+    maintenanceMode: prismaSetting.maintenanceMode,
+    contactEmail: prismaSetting.contactEmail,
+    footerMessage: prismaSetting.footerMessage,
+    updatedAt: new Date(prismaSetting.updatedAt),
+  };
+};
+
 
 // --- Project Data Functions (Prisma Integrated) ---
 export const getProjectById = async (id: string): Promise<AppProject | null> => {
@@ -197,7 +208,7 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
     return mapPrismaProjectToAppProject(newProject);
   } catch (error) {
     console.error('Error creating project in DB with Prisma:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -225,7 +236,7 @@ export const updateProjectInDb = async (id: string, projectData: Partial<Project
     return mapPrismaProjectToAppProject(updatedProject);
   } catch (error) {
     console.error(`Error updating project with ID "${id}" in DB with Prisma:`, error);
-    return null;
+    throw error;
   }
 };
 
@@ -305,12 +316,10 @@ export async function getUsers(): Promise<AppUser[]> {
 
 export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
   try {
-     // Disassociate feedback from the user instead of deleting the feedback
      await prisma.feedback.updateMany({
       where: { user_id: userId },
       data: { user_id: null }, 
     });
-    // Delete the user profile
     await prisma.user.delete({
       where: { id: userId },
     });
@@ -432,7 +441,7 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
     return mapPrismaNewsToAppNews(newArticle);
   } catch (error) {
     console.error('Error creating news article in DB with Prisma:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -454,7 +463,7 @@ export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsAr
     return mapPrismaNewsToAppNews(updatedArticle);
   } catch (error) {
     console.error(`Error updating news article with ID "${id}" in DB with Prisma:`, error);
-    return null;
+    throw error;
   }
 };
 
@@ -526,7 +535,7 @@ export const createServiceInDb = async (serviceData: ServiceCreationData): Promi
     return mapPrismaServiceToAppServiceItem(newService);
   } catch (error) {
     console.error('Error creating service in DB with Prisma:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -546,7 +555,7 @@ export const updateServiceInDb = async (id: string, serviceData: Partial<Service
     return mapPrismaServiceToAppServiceItem(updatedService);
   } catch (error) {
     console.error(`Error updating service with ID "${id}" in DB with Prisma:`, error);
-    return null;
+    throw error;
   }
 };
 
@@ -604,7 +613,7 @@ export const createVideoInDb = async (videoData: VideoCreationData): Promise<App
     return mapPrismaVideoToAppVideo(newVideo);
   } catch (error) {
     console.error('Error creating video in DB with Prisma:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -623,7 +632,7 @@ export const updateVideoInDb = async (id: string, videoData: Partial<VideoCreati
     return mapPrismaVideoToAppVideo(updatedVideo);
   } catch (error) {
     console.error(`Error updating video with ID "${id}" in DB with Prisma:`, error);
-    return null;
+    throw error;
   }
 };
 
@@ -638,3 +647,55 @@ export const deleteVideoFromDb = async (id: string): Promise<boolean> => {
     return false;
   }
 };
+
+// --- Site Settings Data Functions ---
+const SITE_SETTINGS_ID = "global_settings";
+
+export const getSiteSettingsFromDb = async (): Promise<SiteSettings | null> => {
+  try {
+    const settings = await prisma.siteSetting.findUnique({
+      where: { id: SITE_SETTINGS_ID },
+    });
+    if (settings) {
+      return mapPrismaSiteSettingToAppSiteSetting(settings);
+    }
+    // If no settings found, return a default structure or null
+    return { 
+      id: SITE_SETTINGS_ID,
+      siteName: "NigeriaGovHub",
+      maintenanceMode: false,
+      contactEmail: "info@example.com",
+      footerMessage: `© ${new Date().getFullYear()} NigeriaGovHub. All rights reserved.`,
+      updatedAt: new Date(),
+    };
+  } catch (error) {
+    console.error("Error fetching site settings from DB:", error);
+    return null; // Or throw error, or return defaults
+  }
+};
+
+export const updateSiteSettingsInDb = async (settingsData: Partial<Omit<SiteSettings, 'id' | 'updatedAt'>>): Promise<SiteSettings | null> => {
+  try {
+    const dataToUpsert = {
+      siteName: settingsData.siteName,
+      maintenanceMode: settingsData.maintenanceMode,
+      contactEmail: settingsData.contactEmail,
+      footerMessage: settingsData.footerMessage,
+    };
+
+    const updatedSettings = await prisma.siteSetting.upsert({
+      where: { id: SITE_SETTINGS_ID },
+      update: dataToUpsert,
+      create: {
+        id: SITE_SETTINGS_ID,
+        ...dataToUpsert,
+      },
+    });
+    return mapPrismaSiteSettingToAppSiteSetting(updatedSettings);
+  } catch (error) {
+    console.error("Error updating site settings in DB:", error);
+    throw error;
+  }
+};
+
+    

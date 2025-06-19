@@ -1,5 +1,5 @@
 
-import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo } from '@prisma/client';
+import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo, SiteSetting as PrismaSiteSetting } from '@prisma/client';
 import type * as LucideIcons from 'lucide-react';
 
 
@@ -203,3 +203,14 @@ export type VideoFormData = {
   dataAiHint?: string | null;
   description?: string | null;
 };
+
+export interface SiteSettings {
+  id: string;
+  siteName: string | null;
+  maintenanceMode: boolean;
+  contactEmail: string | null;
+  footerMessage: string | null;
+  updatedAt: Date;
+}
+
+    

@@ -1,7 +1,8 @@
+
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  url       = env("DATABASE_URL") // Ensure this points to your Supabase DB URL
+  directUrl = env("DIRECT_URL") // Ensure this points to your Supabase Direct DB URL (for Prisma Migrate)
 }
 
 generator client {
@@ -9,56 +10,55 @@ generator client {
 }
 
 model User {
-  id          String    @id @default(uuid())
+  id          String    @id @default(uuid()) // Supabase auth.users.id is UUID
+  created_at  DateTime? @default(now()) @map("created_at")
   name        String?
-  email       String?   @unique
-  role        String?   @default("user") // 'user' or 'admin'
-  avatar_url  String? // URL for user's avatar
-  created_at  DateTime? @default(now())
-  updated_at  DateTime? @updatedAt
+  email       String?   @unique // Should match Supabase auth.users.email
+  role        String?   @default("user") // e.g., "user", "admin"
+  avatar_url  String?   @map("avatar_url")
   feedback    Feedback[] @relation("UserFeedback")
 
-  @@map("users")
+  @@map("users") // Maps to the 'users' table in your public schema
 }
-
 
 model Project {
   id                String    @id @default(uuid())
-  title             String    @unique // Added unique constraint
+  title             String    @unique // Ensuring project titles are unique
   subtitle          String
-  ministry_id       String?
-  state_id          String?
-  status            String    // e.g., 'Ongoing', 'Completed', 'Planned'
+  ministry_id       String?   @map("ministry_id") // Placeholder, will be string ID from mock/future table
+  state_id          String?   @map("state_id")    // Placeholder, will be string ID from mock/future table
+  status            String    // e.g., "Ongoing", "Completed", "Planned"
   start_date        DateTime  @map("start_date")
   expected_end_date DateTime? @map("expected_end_date")
   actual_end_date   DateTime? @map("actual_end_date")
   description       String    @db.Text
-  images            Json?     // Store as JSON array of objects: { url: string; alt: string; dataAiHint?: string }
-  videos            Json?     // Store as JSON array of objects: { id: string; title: string; url: string; thumbnailUrl?: string; description?: string; dataAiHint?: string }
-  impact_stats      Json?     // Store as JSON array of objects: { label: string; value: string; iconName?: string }
-  budget            Float?
+  images            Json?     // Can store array of { url: string; alt: string }
+  videos            Json?     // Can store array of { title: string; url: string; thumbnailUrl?: string }
+  impact_stats      Json?     // Can store array of { label: string; value: string; icon?: string }
+  budget            Float?    // Using Float for currency
   expenditure       Float?
   tags              String[]  @default([])
   last_updated_at   DateTime  @updatedAt @map("last_updated_at")
   created_at        DateTime  @default(now()) @map("created_at")
-
+  
   feedback_list     Feedback[] @relation("ProjectFeedback")
 
-  @@map("projects")
+
+  @@map("projects") // Explicitly maps to the "projects" table
 }
 
 model Feedback {
   id                String    @id @default(uuid())
-  project_id        String
-  user_id           String?   // Nullable if feedback can be anonymous or user deleted
-  user_name         String    // Name provided at time of feedback
+  project_id        String    @map("project_id")
+  user_id           String?   @map("user_id") // Nullable if feedback can be anonymous or user is deleted
+  user_name         String    @map("user_name") // Store name at time of feedback
   comment           String    @db.Text
-  rating            Int?      // Optional rating, e.g., 1-5
-  sentiment_summary String?   // Optional AI-generated sentiment summary
+  rating            Int?      // e.g., 1-5 stars
+  sentiment_summary String?   @map("sentiment_summary") // Optional sentiment analysis result
   created_at        DateTime  @default(now()) @map("created_at")
-
+  
   project           Project   @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
-  user              User?     @relation("UserFeedback", fields: [user_id], references: [id], onDelete: SetNull) // SetNull if user is deleted
+  user              User?     @relation("UserFeedback", fields: [user_id], references: [id], onDelete: SetNull)
 
   @@index([project_id])
   @@index([user_id])
@@ -67,7 +67,7 @@ model Feedback {
 
 model NewsArticle {
   id            String    @id @default(uuid())
-  slug          String    @unique
+  slug          String    @unique // URL-friendly identifier
   title         String
   summary       String    @db.Text
   imageUrl      String?   @map("image_url")
@@ -86,8 +86,8 @@ model Service {
   slug         String   @unique
   title        String
   summary      String   @db.Text
-  iconName     String?  @map("icon_name")
-  link         String?
+  iconName     String?  @map("icon_name") 
+  link         String?  
   category     String
   imageUrl     String?  @map("image_url")
   dataAiHint   String?  @map("data_ai_hint")
@@ -100,7 +100,7 @@ model Service {
 model Video {
   id            String    @id @default(uuid())
   title         String
-  url           String
+  url           String    
   thumbnailUrl  String?   @map("thumbnail_url")
   dataAiHint    String?   @map("data_ai_hint")
   description   String?   @db.Text
@@ -109,3 +109,16 @@ model Video {
 
   @@map("videos")
 }
+
+model SiteSetting {
+  id              String    @id @default("global_settings")
+  siteName        String?   @map("siteName")
+  maintenanceMode Boolean   @default(false) @map("maintenanceMode")
+  contactEmail    String?   @map("contactEmail")
+  footerMessage   String?   @map("footerMessage")
+  updatedAt       DateTime  @updatedAt
+
+  @@map("site_settings")
+}
+
+    
