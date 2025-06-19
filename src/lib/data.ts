@@ -2,7 +2,7 @@
 import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem, ProjectFormData } from '@/types';
 import * as LucideIcons from 'lucide-react';
 import prisma from './prisma';
-import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService } from '@prisma/client';
+import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo } from '@prisma/client';
 
 // --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
@@ -123,6 +123,20 @@ const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): Service
     dataAiHint: prismaService.dataAiHint,
     createdAt: new Date(prismaService.createdAt),
     updatedAt: new Date(prismaService.updatedAt),
+  };
+};
+
+// --- Helper function to map Prisma Video to AppVideo ---
+const mapPrismaVideoToAppVideo = (prismaVideo: PrismaVideo): Video => {
+  return {
+    id: prismaVideo.id,
+    title: prismaVideo.title,
+    url: prismaVideo.url,
+    thumbnailUrl: prismaVideo.thumbnailUrl,
+    dataAiHint: prismaVideo.dataAiHint,
+    description: prismaVideo.description,
+    createdAt: new Date(prismaVideo.createdAt),
+    updatedAt: new Date(prismaVideo.updatedAt),
   };
 };
 
@@ -518,14 +532,15 @@ export const createServiceInDb = async (serviceData: ServiceCreationData): Promi
 
 export const updateServiceInDb = async (id: string, serviceData: Partial<ServiceCreationData>): Promise<ServiceItem | null> => {
   try {
+    const dataToUpdate = {...serviceData}; // Create a mutable copy
     const updatedService = await prisma.service.update({
       where: { id },
       data: {
-        ...serviceData,
-        iconName: serviceData.iconName === '' ? null : serviceData.iconName,
-        link: serviceData.link === '' ? null : serviceData.link,
-        imageUrl: serviceData.imageUrl === '' ? null : serviceData.imageUrl,
-        dataAiHint: serviceData.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
+        ...dataToUpdate,
+        iconName: dataToUpdate.iconName === '' ? null : dataToUpdate.iconName,
+        link: dataToUpdate.link === '' ? null : dataToUpdate.link,
+        imageUrl: dataToUpdate.imageUrl === '' ? null : dataToUpdate.imageUrl,
+        dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
       },
     });
     return mapPrismaServiceToAppServiceItem(updatedService);
@@ -547,12 +562,27 @@ export const deleteServiceFromDb = async (id: string): Promise<boolean> => {
   }
 };
 
+// --- Video Data Functions (Prisma Integrated) ---
+export const getAllVideosFromDb = async (): Promise<Video[]> => {
+  try {
+    const prismaVideos = await prisma.video.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    return prismaVideos.map(mapPrismaVideoToAppVideo);
+  } catch (error) {
+    console.error('Error fetching all videos with Prisma:', error);
+    return [];
+  }
+};
+
 
 // --- Mock Data (to be phased out as features are migrated) ---
-export const mockFeaturedVideos: Video[] = [
-  { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
-  { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
-  { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
-];
-
+// export const mockFeaturedVideos: Video[] = [
+//   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
+//   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
+//   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
+// ];
+// Commented out as we are now fetching from DB
     

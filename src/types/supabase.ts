@@ -193,7 +193,7 @@ export interface Database {
         }
         Relationships: []
       }
-      services: { // Added Service table definition
+      services: { 
         Row: {
           id: string
           slug: string
@@ -204,8 +204,8 @@ export interface Database {
           category: string
           image_url: string | null
           data_ai_hint: string | null
-          created_at: string // timestamptz
-          updated_at: string // timestamptz
+          created_at: string 
+          updated_at: string 
         }
         Insert: {
           id?: string
@@ -230,6 +230,39 @@ export interface Database {
           category?: string
           image_url?: string | null
           data_ai_hint?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      videos: { // Added Video table definition
+        Row: {
+          id: string
+          title: string
+          url: string
+          thumbnail_url: string | null
+          data_ai_hint: string | null
+          description: string | null
+          created_at: string // timestamptz
+          updated_at: string // timestamptz
+        }
+        Insert: {
+          id?: string
+          title: string
+          url: string
+          thumbnail_url?: string | null
+          data_ai_hint?: string | null
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          url?: string
+          thumbnail_url?: string | null
+          data_ai_hint?: string | null
+          description?: string | null
           created_at?: string
           updated_at?: string
         }

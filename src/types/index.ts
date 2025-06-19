@@ -1,5 +1,5 @@
 
-import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService } from '@prisma/client';
+import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo } from '@prisma/client';
 import type * as LucideIcons from 'lucide-react';
 
 
@@ -36,10 +36,12 @@ export interface ImpactStat {
 export interface Video {
   id: string;
   title: string;
-  url: string;
-  thumbnailUrl?: string;
-  description?: string;
-  dataAiHint?: string;
+  url: string; // Should be the embeddable URL
+  thumbnailUrl?: string | null;
+  description?: string | null;
+  dataAiHint?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Project {
@@ -95,8 +97,8 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  iconName?: keyof typeof LucideIcons | null; // Updated to allow null
-  icon?: React.ElementType; // Resolved on client
+  iconName?: keyof typeof LucideIcons | null; 
+  icon?: React.ElementType; 
   link?: string | null;
   category: string;
   imageUrl?: string | null;
@@ -186,4 +188,11 @@ export type ServiceFormData = {
   iconName?: string | null;
 };
 
-```
+// Video Type (already defined above, but good to ensure PrismaVideo is imported if needed for raw types)
+export type VideoFormData = {
+  title: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  dataAiHint?: string | null;
+  description?: string | null;
+};

@@ -1,7 +1,7 @@
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL") // For Prisma Migrate, if different
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -9,17 +9,16 @@ generator client {
 }
 
 model User {
-  id          String    @id // Matches Supabase Auth user ID (UUID)
-  email       String?   @unique
+  id          String    @id @default(uuid())
   name        String?
-  role        String?   // e.g., 'user', 'admin'
-  avatar_url  String?
+  email       String?   @unique
+  role        String?   @default("user") // 'user' or 'admin'
+  avatar_url  String? // URL for user's avatar
   created_at  DateTime? @default(now())
   updated_at  DateTime? @updatedAt
-
   feedback    Feedback[] @relation("UserFeedback")
 
-  @@map("users") // Explicitly map to the 'users' table in public schema
+  @@map("users")
 }
 
 
@@ -27,17 +26,17 @@ model Project {
   id                String    @id @default(uuid())
   title             String    @unique // Added unique constraint
   subtitle          String
-  ministry_id       String?   // Using String for now, will map to mock data
-  state_id          String?   // Using String for now, will map to mock data
+  ministry_id       String?
+  state_id          String?
   status            String    // e.g., 'Ongoing', 'Completed', 'Planned'
   start_date        DateTime  @map("start_date")
   expected_end_date DateTime? @map("expected_end_date")
   actual_end_date   DateTime? @map("actual_end_date")
   description       String    @db.Text
-  images            Json?     // Store as JSON array of { url: string; alt: string; dataAiHint?: string }
-  videos            Json?     // Store as JSON array of Video type
-  impact_stats      Json?     // Store as JSON array of ImpactStat type
-  budget            Float?    // Using Float for currency
+  images            Json?     // Store as JSON array of objects: { url: string; alt: string; dataAiHint?: string }
+  videos            Json?     // Store as JSON array of objects: { id: string; title: string; url: string; thumbnailUrl?: string; description?: string; dataAiHint?: string }
+  impact_stats      Json?     // Store as JSON array of objects: { label: string; value: string; iconName?: string }
+  budget            Float?
   expenditure       Float?
   tags              String[]  @default([])
   last_updated_at   DateTime  @updatedAt @map("last_updated_at")
@@ -51,16 +50,18 @@ model Project {
 model Feedback {
   id                String    @id @default(uuid())
   project_id        String
-  user_id           String?
-  user_name         String
+  user_id           String?   // Nullable if feedback can be anonymous or user deleted
+  user_name         String    // Name provided at time of feedback
   comment           String    @db.Text
-  rating            Int?
-  sentiment_summary String?
+  rating            Int?      // Optional rating, e.g., 1-5
+  sentiment_summary String?   // Optional AI-generated sentiment summary
   created_at        DateTime  @default(now()) @map("created_at")
 
   project           Project   @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
-  user              User?     @relation("UserFeedback", fields: [user_id], references: [id], onDelete: SetNull) // SetNull if user deleted
+  user              User?     @relation("UserFeedback", fields: [user_id], references: [id], onDelete: SetNull) // SetNull if user is deleted
 
+  @@index([project_id])
+  @@index([user_id])
   @@map("feedback")
 }
 
@@ -94,4 +95,17 @@ model Service {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("services")
+}
+
+model Video {
+  id            String    @id @default(uuid())
+  title         String
+  url           String
+  thumbnailUrl  String?   @map("thumbnail_url")
+  dataAiHint    String?   @map("data_ai_hint")
+  description   String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("videos")
 }
