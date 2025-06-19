@@ -6,15 +6,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, PlusCircle, Server } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useEffect, useState, useTransition } from "react";
+import { MoreHorizontal, PlusCircle, Server, Edit, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import React, { useEffect, useState, useTransition } from "react";
 import type { ServiceItem } from "@/types"; 
 import { getAllServices as fetchServicesFromDb } from "@/lib/data"; 
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { deleteService } from "@/lib/actions";
 
 export default function ManageServicesPage() {
   const { profile, isAdmin, isLoading: authLoading } = useAuth();
@@ -22,34 +33,49 @@ export default function ManageServicesPage() {
   const { toast } = useToast();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  // Add transitions and delete state if/when delete is implemented
-  // const [isDeleting, startDeleteTransition] = useTransition();
-  // const [serviceToDelete, setServiceToDelete] = useState<ServiceItem | null>(null);
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [serviceToDelete, setServiceToDelete] = useState<ServiceItem | null>(null);
+
+  const fetchAdminServices = React.useCallback(async () => {
+    if (!authLoading) {
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+        return;
+      }
+      
+      setIsLoadingData(true);
+      try {
+        const fetchedServices = await fetchServicesFromDb(); 
+        setServices(fetchedServices);
+      } catch (error) {
+        console.error("Failed to fetch services for admin:", error);
+        toast({ title: "Error", description: "Failed to load services.", variant: "destructive" });
+        setServices([]);
+      } finally {
+        setIsLoadingData(false);
+      }
+    }
+  }, [isAdmin, authLoading, router, toast]);
 
   useEffect(() => {
-    const fetchAdminServices = async () => {
-      if (!authLoading) {
-        if (!isAdmin) {
-          toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-          router.replace("/dashboard/user");
-          return;
-        }
-        
-        setIsLoadingData(true);
-        try {
-          const fetchedServices = await fetchServicesFromDb(); 
-          setServices(fetchedServices);
-        } catch (error) {
-          console.error("Failed to fetch services for admin:", error);
-          toast({ title: "Error", description: "Failed to load services.", variant: "destructive" });
-          setServices([]);
-        } finally {
-          setIsLoadingData(false);
-        }
-      }
-    };
     fetchAdminServices();
-  }, [profile, isAdmin, authLoading, router, toast]);
+  }, [fetchAdminServices]);
+
+  const handleDeleteService = async () => {
+    if (!serviceToDelete) return;
+
+    startDeleteTransition(async () => {
+      const result = await deleteService(serviceToDelete.id);
+      if (result.success) {
+        toast({ title: "Service Deleted", description: result.message });
+        setServices((prevServices) => prevServices.filter((s) => s.id !== serviceToDelete.id));
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+      setServiceToDelete(null);
+    });
+  };
 
   const overallLoading = authLoading || (isLoadingData && isAdmin);
 
@@ -140,19 +166,30 @@ export default function ManageServicesPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" disabled={isDeleting}>
                             <MoreHorizontal className="h-4 w-4" />
                              <span className="sr-only">Service Actions</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit Service (Soon)</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/admin/manage-services/edit/${service.id}`}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit Service
+                            </Link>
+                          </DropdownMenuItem>
                           {service.link ? (
                             <DropdownMenuItem asChild><a href={service.link} target="_blank" rel="noopener noreferrer">Visit External Link</a></DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem asChild><Link href={`/services/${service.slug}`} target="_blank">View Service Page (Soon)</Link></DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="text-destructive">Delete Service (Soon)</DropdownMenuItem>
+                          ) : service.slug ? (
+                            <DropdownMenuItem asChild><Link href={`/services/${service.slug}`} target="_blank">View Service Page</Link></DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => setServiceToDelete(service)} 
+                            className="text-destructive"
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Service
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -163,6 +200,31 @@ export default function ManageServicesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {serviceToDelete && (
+        <AlertDialog open={!!serviceToDelete} onOpenChange={() => setServiceToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the service titled &quot;{serviceToDelete.title}&quot;.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setServiceToDelete(null)} disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteService}
+                disabled={isDeleting}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete Service"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

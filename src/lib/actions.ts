@@ -16,8 +16,13 @@ import {
   type NewsArticleCreationData,
   updateNewsArticleInDb,
   deleteNewsArticleFromDb,
+  createServiceInDb as saveServiceToDb,
+  type ServiceCreationData,
+  updateServiceInDb,
+  deleteServiceFromDb,
+  getServiceById as getServiceFromDb,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, NewsArticleFormData, ProjectFormData } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, NewsArticleFormData, ProjectFormData, ServiceFormData } from '@/types';
 import prisma from './prisma';
 
 
@@ -162,6 +167,10 @@ export async function addProject(
       budget: formData.budget,
       expenditure: formData.expenditure,
       tags: formData.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
+      // Initialize complex fields as empty or default if not handled by form
+      images: [], 
+      videos: [],
+      impact_stats: [],
     };
 
     const newProject = await saveProjectToDb(dataToSave);
@@ -256,9 +265,9 @@ export async function addNewsArticle(
 
     const dataToSave: NewsArticleCreationData = {
       ...newsData,
-      published_date: newsData.publishedDate, 
-      image_url: newsData.imageUrl,
-      data_ai_hint: newsData.dataAiHint,
+      publishedDate: newsData.publishedDate, 
+      imageUrl: newsData.imageUrl,
+      dataAiHint: newsData.dataAiHint,
     };
 
     const newArticle = await saveNewsArticleToDb(dataToSave);
@@ -303,9 +312,9 @@ export async function updateNewsArticle(
     
     const dataToUpdate: Partial<NewsArticleCreationData> = {
       ...newsData,
-      published_date: newsData.publishedDate,
-      image_url: newsData.imageUrl,
-      data_ai_hint: newsData.dataAiHint,
+      publishedDate: newsData.publishedDate,
+      imageUrl: newsData.imageUrl,
+      dataAiHint: newsData.dataAiHint,
     };
 
 
@@ -350,3 +359,99 @@ export async function deleteNewsArticle(id: string): Promise<ActionResult> {
   }
 }
 
+export async function addService(
+  serviceData: ServiceFormData
+): Promise<ActionResult<AppServiceItem>> {
+  try {
+    const existingServiceBySlug = await prisma.service.findUnique({ where: { slug: serviceData.slug } });
+    if (existingServiceBySlug) {
+      return { success: false, message: `A service with the slug "${serviceData.slug}" already exists.` };
+    }
+
+    const dataToSave: ServiceCreationData = {
+      ...serviceData,
+    };
+
+    const newService = await saveServiceToDb(dataToSave);
+    if (!newService) {
+      return { success: false, message: 'Failed to save service to the database.' };
+    }
+
+    revalidatePath('/services');
+    revalidatePath(`/services/${newService.slug}`); // If individual service pages exist
+    revalidatePath('/dashboard/admin/manage-services');
+    revalidatePath('/');
+    return { success: true, message: 'Service added successfully!', item: newService };
+  } catch (error) {
+    console.error('Error adding service:', error);
+    let errorMessage = 'An unexpected error occurred while adding the service.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('slug')) {
+        errorMessage = 'A service with this slug already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function updateService(
+  id: string,
+  serviceData: ServiceFormData
+): Promise<ActionResult<AppServiceItem>> {
+  try {
+    if (serviceData.slug) {
+      const existingServiceBySlug = await prisma.service.findFirst({
+        where: {
+          slug: serviceData.slug,
+          id: { not: id }
+        }
+      });
+      if (existingServiceBySlug) {
+        return { success: false, message: `Another service with the slug "${serviceData.slug}" already exists.` };
+      }
+    }
+
+    const dataToUpdate: Partial<ServiceCreationData> = {
+      ...serviceData,
+    };
+
+    const updatedService = await updateServiceInDb(id, dataToUpdate);
+    if (!updatedService) {
+      return { success: false, message: 'Failed to update service in the database.' };
+    }
+
+    revalidatePath('/services');
+    revalidatePath(`/services/${updatedService.slug}`); // If individual service pages exist
+    revalidatePath('/dashboard/admin/manage-services');
+    revalidatePath('/');
+    return { success: true, message: 'Service updated successfully!', item: updatedService };
+  } catch (error) {
+    console.error('Error updating service:', error);
+    let errorMessage = 'An unexpected error occurred while updating the service.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('slug')) {
+        errorMessage = 'A service with this slug already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function deleteService(id: string): Promise<ActionResult> {
+  try {
+    const success = await deleteServiceFromDb(id);
+    if (!success) {
+      return { success: false, message: 'Failed to delete service from the database.' };
+    }
+
+    revalidatePath('/services');
+    revalidatePath('/dashboard/admin/manage-services');
+    revalidatePath('/');
+    return { success: true, message: 'Service deleted successfully!' };
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    return { success: false, message: 'An unexpected error occurred while deleting the service.', errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}

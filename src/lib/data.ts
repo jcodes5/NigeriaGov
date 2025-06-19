@@ -51,8 +51,8 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
     videos: (prismaProject.videos as unknown as Video[] || []),
     impactStats: mappedImpactStats,
-    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined, 
-    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined, 
+    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined,
+    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined,
     tags: prismaProject.tags || [],
     lastUpdatedAt: new Date(prismaProject.last_updated_at),
     feedback: prismaProject.feedback_list?.map(mapPrismaFeedbackToAppFeedback) || [],
@@ -94,10 +94,10 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
     slug: prismaNews.slug,
     title: prismaNews.title,
     summary: prismaNews.summary,
-    imageUrl: prismaNews.imageUrl, 
-    dataAiHint: prismaNews.dataAiHint, 
+    imageUrl: prismaNews.imageUrl,
+    dataAiHint: prismaNews.dataAiHint,
     category: prismaNews.category,
-    publishedDate: new Date(prismaNews.publishedDate), 
+    publishedDate: new Date(prismaNews.publishedDate),
     content: prismaNews.content,
     createdAt: new Date(prismaNews.createdAt),
     updatedAt: new Date(prismaNews.updatedAt),
@@ -106,8 +106,8 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
 
 // --- Helper function to map Prisma Service to AppServiceItem ---
 const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): ServiceItem => {
-  const IconComponent = prismaService.iconName && LucideIcons[prismaService.iconName as keyof typeof LucideIcons] 
-    ? LucideIcons[prismaService.iconName as keyof typeof LucideIcons] 
+  const IconComponent = prismaService.iconName && LucideIcons[prismaService.iconName as keyof typeof LucideIcons]
+    ? LucideIcons[prismaService.iconName as keyof typeof LucideIcons]
     : LucideIcons.Server; // Default icon
 
   return {
@@ -115,7 +115,7 @@ const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): Service
     slug: prismaService.slug,
     title: prismaService.title,
     summary: prismaService.summary,
-    iconName: prismaService.iconName as keyof typeof LucideIcons || undefined,
+    iconName: prismaService.iconName as keyof typeof LucideIcons || null,
     icon: IconComponent,
     link: prismaService.link,
     category: prismaService.category,
@@ -133,7 +133,7 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     const projectWithFeedback = await prisma.project.findUnique({
       where: { id },
       include: {
-        feedback_list: { 
+        feedback_list: {
           orderBy: { created_at: 'desc' },
         },
       },
@@ -143,7 +143,7 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     return mapPrismaProjectToAppProject(projectWithFeedback);
   } catch (error) {
     console.error('Error fetching project by ID with Prisma:', error);
-    return null; 
+    return null;
   }
 };
 
@@ -151,7 +151,7 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
   try {
     const prismaProjects = await prisma.project.findMany({
       orderBy: {
-        last_updated_at: 'desc', 
+        last_updated_at: 'desc',
       },
     });
     return prismaProjects.map(mapPrismaProjectToAppProject);
@@ -163,6 +163,12 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
 
 export type ProjectCreationData = Omit<PrismaProject, 'id' | 'created_at' | 'last_updated_at' | 'images' | 'videos' | 'impact_stats' | 'feedback_list'> & {
   tags?: string[];
+  // Added to allow passing these as potentially undefined in the creation process,
+  // as they are complex types (Json) that the simple form doesn't handle yet.
+  // The DB schema allows them to be null.
+  images?: any;
+  videos?: any;
+  impact_stats?: any;
 };
 
 export const createProjectInDb = async (projectData: ProjectCreationData): Promise<AppProject | null> => {
@@ -170,11 +176,11 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
     const newProject = await prisma.project.create({
       data: {
         ...projectData,
-        budget: projectData.budget ?? undefined, 
+        budget: projectData.budget ?? undefined,
         expenditure: projectData.expenditure ?? undefined,
-        images: projectData.images || [], 
-        videos: projectData.videos || [], 
-        impact_stats: projectData.impact_stats || [], 
+        images: projectData.images || [],
+        videos: projectData.videos || [],
+        impact_stats: projectData.impact_stats || [],
       },
     });
     return mapPrismaProjectToAppProject(newProject);
@@ -187,19 +193,25 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
 export const updateProjectInDb = async (id: string, projectData: Partial<ProjectCreationData>): Promise<AppProject | null> => {
   try {
     const dataToUpdate = { ...projectData };
+    // Convert date strings to Date objects if they are strings
     if (dataToUpdate.start_date && typeof dataToUpdate.start_date === 'string') {
       dataToUpdate.start_date = new Date(dataToUpdate.start_date);
     }
     if (dataToUpdate.expected_end_date && typeof dataToUpdate.expected_end_date === 'string') {
       dataToUpdate.expected_end_date = new Date(dataToUpdate.expected_end_date);
     }
-    
+    // Ensure nullable fields are handled correctly
+    const budget = dataToUpdate.budget === undefined ? null : Number(dataToUpdate.budget);
+    const expenditure = dataToUpdate.expenditure === undefined ? null : Number(dataToUpdate.expenditure);
+
+
     const updatedProject = await prisma.project.update({
       where: { id },
       data: {
         ...dataToUpdate,
-        budget: dataToUpdate.budget ?? undefined,
-        expenditure: dataToUpdate.expenditure ?? undefined,
+        budget: budget,
+        expenditure: expenditure,
+        // Ensure complex fields are not accidentally overwritten if not provided
         // images, videos, impact_stats are not updated via this simple form for now
       },
     });
@@ -212,9 +224,11 @@ export const updateProjectInDb = async (id: string, projectData: Partial<Project
 
 export const deleteProjectFromDb = async (id: string): Promise<boolean> => {
   try {
+    // First, delete related feedback to avoid foreign key constraint issues
     await prisma.feedback.deleteMany({
       where: { project_id: id },
     });
+    // Then, delete the project
     await prisma.project.delete({
       where: { id },
     });
@@ -253,7 +267,7 @@ export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedba
   try {
     const feedbackWithProjects = await prisma.feedback.findMany({
       include: {
-        project: { 
+        project: {
           select: { title: true },
         },
       },
@@ -288,7 +302,7 @@ export async function deleteUserById(userId: string): Promise<{ success: boolean
   try {
      await prisma.feedback.updateMany({
       where: { user_id: userId },
-      data: { user_id: null },
+      data: { user_id: null }, // Or delete them if preferred: await prisma.feedback.deleteMany({ where: { user_id: userId }})
     });
     await prisma.user.delete({
       where: { id: userId },
@@ -307,6 +321,7 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
     });
 
     if (existingUser) {
+      // User profile already exists, update if necessary
       const dataToUpdate: { name?: string | null; avatar_url?: string | null } = {};
       let needsUpdate = false;
 
@@ -314,11 +329,12 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
         dataToUpdate.name = userData.name;
         needsUpdate = true;
       }
-      if (userData.avatar_url !== existingUser.avatar_url && userData.avatar_url !== undefined) {
-        dataToUpdate.avatar_url = userData.avatar_url;
+      // Ensure avatar_url is only updated if a new value is provided, not if userData.avatar_url is undefined
+      if (userData.avatar_url !== undefined && userData.avatar_url !== existingUser.avatar_url) {
+        dataToUpdate.avatar_url = userData.avatar_url; // This can be null if explicitly passed as null
         needsUpdate = true;
       }
-      
+
       if (needsUpdate) {
         const updatedUser = await prisma.user.update({
           where: { id: userData.id },
@@ -326,22 +342,24 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
         });
         return mapPrismaUserToAppUser(updatedUser);
       }
-      return mapPrismaUserToAppUser(existingUser);
+      return mapPrismaUserToAppUser(existingUser); // Return existing if no update needed
     } else {
+      // User profile does not exist, create it
       const newUser = await prisma.user.create({
         data: {
           id: userData.id,
           name: userData.name,
-          email: userData.email, 
-          role: userData.role || 'user', 
+          email: userData.email,
+          role: userData.role || 'user', // Default role
           avatar_url: userData.avatar_url,
         },
       });
       return mapPrismaUserToAppUser(newUser);
     }
   } catch (error) {
-    console.error('Error in createUserProfileInDb:', error); 
-    throw error; 
+    console.error('Error in createUserProfileInDb:', error);
+    // Rethrow the error so the calling server action can handle it (e.g., check for P2002 on email)
+    throw error;
   }
 }
 
@@ -404,8 +422,8 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
     const newArticle = await prisma.newsArticle.create({
       data: {
         ...newsData,
-        imageUrl: newsData.imageUrl || null, 
-        dataAiHint: newsData.dataAiHint || null, 
+        imageUrl: newsData.imageUrl || null,
+        dataAiHint: newsData.dataAiHint || null,
       }
     });
     return mapPrismaNewsToAppNews(newArticle);
@@ -418,14 +436,16 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
 export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsArticleCreationData>): Promise<AppNewsArticle | null> => {
   try {
     const dataToUpdate = { ...newsData };
+    // Convert date string to Date object if necessary
     if (dataToUpdate.publishedDate && typeof dataToUpdate.publishedDate === 'string') {
       dataToUpdate.publishedDate = new Date(dataToUpdate.publishedDate);
     }
-    
+
     const updatedArticle = await prisma.newsArticle.update({
       where: { id },
       data: {
         ...dataToUpdate,
+        // Ensure optional fields are set to null if empty string is passed
         imageUrl: dataToUpdate.imageUrl === '' ? null : dataToUpdate.imageUrl,
         dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
       },
@@ -455,7 +475,7 @@ export const getAllServices = async (): Promise<ServiceItem[]> => {
   try {
     const prismaServices = await prisma.service.findMany({
       orderBy: {
-        title: 'asc', // Or createdAt, or any other field
+        title: 'asc',
       },
     });
     return prismaServices.map(mapPrismaServiceToAppServiceItem);
@@ -476,6 +496,70 @@ export const getServiceBySlug = async (slug: string): Promise<ServiceItem | unde
     return undefined;
   }
 };
+
+export const getServiceById = async (id: string): Promise<ServiceItem | null> => {
+  try {
+    const service = await prisma.service.findUnique({
+      where: { id },
+    });
+    return service ? mapPrismaServiceToAppServiceItem(service) : null;
+  } catch (error) {
+    console.error(`Error fetching service by ID "${id}" with Prisma:`, error);
+    return null;
+  }
+};
+
+export type ServiceCreationData = Omit<PrismaService, 'id' | 'createdAt' | 'updatedAt'>;
+
+export const createServiceInDb = async (serviceData: ServiceCreationData): Promise<ServiceItem | null> => {
+  try {
+    const newService = await prisma.service.create({
+      data: {
+        ...serviceData,
+        iconName: serviceData.iconName || null,
+        link: serviceData.link || null,
+        imageUrl: serviceData.imageUrl || null,
+        dataAiHint: serviceData.dataAiHint || null,
+      }
+    });
+    return mapPrismaServiceToAppServiceItem(newService);
+  } catch (error) {
+    console.error('Error creating service in DB with Prisma:', error);
+    return null;
+  }
+};
+
+export const updateServiceInDb = async (id: string, serviceData: Partial<ServiceCreationData>): Promise<ServiceItem | null> => {
+  try {
+    const updatedService = await prisma.service.update({
+      where: { id },
+      data: {
+        ...serviceData,
+        iconName: serviceData.iconName === '' ? null : serviceData.iconName,
+        link: serviceData.link === '' ? null : serviceData.link,
+        imageUrl: serviceData.imageUrl === '' ? null : serviceData.imageUrl,
+        dataAiHint: serviceData.dataAiHint === '' ? null : serviceData.dataAiHint,
+      },
+    });
+    return mapPrismaServiceToAppServiceItem(updatedService);
+  } catch (error) {
+    console.error(`Error updating service with ID "${id}" in DB with Prisma:`, error);
+    return null;
+  }
+};
+
+export const deleteServiceFromDb = async (id: string): Promise<boolean> => {
+  try {
+    await prisma.service.delete({
+      where: { id },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting service with ID "${id}" from DB with Prisma:`, error);
+    return false;
+  }
+};
+
 
 // --- Mock Data (to be phased out as features are migrated) ---
 export const mockFeaturedVideos: Video[] = [

@@ -95,7 +95,7 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  iconName?: keyof typeof LucideIcons;
+  iconName?: keyof typeof LucideIcons | null; // Updated to allow null
   icon?: React.ElementType; // Resolved on client
   link?: string | null;
   category: string;
@@ -162,3 +162,28 @@ export type NewsArticleFormData = {
   imageUrl?: string | null;
   dataAiHint?: string | null;
 };
+
+export const serviceFormSchemaRaw = {
+  title: (z: any) => z.string().min(3, "Title must be at least 3 characters.").max(150),
+  slug: (z: any) => z.string().min(3, "Slug must be at least 3 chars.").max(150)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens."),
+  summary: (z: any) => z.string().min(10, "Summary must be at least 10 characters.").max(500),
+  category: (z: any) => z.string().min(2, "Category must be at least 2 characters.").max(50),
+  link: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  imageUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  dataAiHint: (z: any) => z.string().max(50, "AI hint too long (max 2 words).").optional().nullable(),
+  iconName: (z: any) => z.string().max(50, "Icon name too long.").optional().nullable(),
+};
+
+export type ServiceFormData = {
+  title: string;
+  slug: string;
+  summary: string;
+  category: string;
+  link?: string | null;
+  imageUrl?: string | null;
+  dataAiHint?: string | null;
+  iconName?: string | null;
+};
+
+```
