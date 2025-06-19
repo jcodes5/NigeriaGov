@@ -300,33 +300,52 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
     const existingUser = await prisma.user.findUnique({
       where: { id: userData.id },
     });
+
     if (existingUser) {
-      const updatedUser = await prisma.user.update({
-        where: { id: userData.id },
+      // User profile already exists. Update name or avatar if they differ.
+      const dataToUpdate: { name?: string | null; avatar_url?: string | null } = {};
+      let needsUpdate = false;
+
+      if (userData.name !== existingUser.name) {
+        dataToUpdate.name = userData.name;
+        needsUpdate = true;
+      }
+      if (userData.avatar_url !== existingUser.avatar_url) {
+        dataToUpdate.avatar_url = userData.avatar_url;
+        needsUpdate = true;
+      }
+      // Do not update email or role here as part of a generic sync/create.
+      // Email is critical and its uniqueness handled by P2002 check in syncUserProfile.
+      // Role is 'user' on creation.
+
+      if (needsUpdate) {
+        const updatedUser = await prisma.user.update({
+          where: { id: userData.id },
+          data: dataToUpdate,
+        });
+        return mapPrismaUserToAppUser(updatedUser);
+      }
+      // No update needed, return the existing user data mapped to AppUser
+      return mapPrismaUserToAppUser(existingUser);
+    } else {
+      // User profile does not exist, create it
+      const newUser = await prisma.user.create({
         data: {
+          id: userData.id,
           name: userData.name,
-          email: userData.email, 
+          email: userData.email, // Email must be provided for new user
+          role: userData.role || 'user', // Default to 'user' if not provided from syncUserProfile
           avatar_url: userData.avatar_url,
         },
       });
-      return mapPrismaUserToAppUser(updatedUser);
+      return mapPrismaUserToAppUser(newUser);
     }
-
-    const newUser = await prisma.user.create({
-      data: {
-        id: userData.id,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role || 'user',
-        avatar_url: userData.avatar_url,
-      },
-    });
-    return mapPrismaUserToAppUser(newUser);
   } catch (error) {
-    console.error('Error creating/updating user profile in DB with Prisma:', error);
-    throw error;
+    console.error('Error in createUserProfileInDb:', error); // Log the detailed error
+    throw error; // Re-throw to be caught and handled more specifically by syncUserProfile
   }
 }
+
 
 export async function getUserProfileFromDb(userId: string): Promise<AppUser | null> {
   try {
