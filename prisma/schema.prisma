@@ -6,8 +6,26 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql" // Changed from postgresql
+  provider = "mysql" // Changed from "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  password      String? // For credentials provider
+  role          String?   @default("user") // e.g., 'user', 'admin'
+  created_at    DateTime  @default(now()) @map("created_at")
+  updated_at    DateTime  @updatedAt @map("updated_at")
+
+  accounts Account[]
+  sessions Session[]
+  feedback Feedback[] // User can have multiple feedback entries
+
+  @@map("users")
 }
 
 model Account {
@@ -40,24 +58,6 @@ model Session {
   @@map("sessions")
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime? @map("email_verified")
-  image         String?
-  password      String? // For credentials provider
-  role          Role      @default(USER)
-  created_at    DateTime  @default(now()) @map("created_at")
-  updated_at    DateTime  @updatedAt @map("updated_at")
-
-  accounts Account[]
-  sessions Session[]
-  feedback Feedback[]
-
-  @@map("users")
-}
-
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -67,93 +67,74 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-enum Role {
-  USER
-  ADMIN
-
-  @@map("user_role")
-}
-
 model Project {
-  id                String        @id @default(uuid())
-  title             String        @unique
-  subtitle          String
-  ministry_id       String?       @map("ministry_id") // Assuming these are string identifiers for now
-  state_id          String?       @map("state_id")    // Assuming these are string identifiers for now
-  status            ProjectStatus @default(PLANNED)
-  start_date        DateTime      @map("start_date")
-  expected_end_date DateTime?     @map("expected_end_date")
-  actual_end_date   DateTime?     @map("actual_end_date")
-  description       String        @db.Text
-  images            Json?         // Store as JSON array of { url: string; alt: string; dataAiHint?: string }
-  videos            Json?         // Store as JSON array of Video type
-  impact_stats      Json?         @map("impact_stats") // Store as JSON array of ImpactStat type
-  budget            Decimal?
-  expenditure       Decimal?
-  tags              String[] // Prisma maps this to JSON on MySQL if native array isn't supported
-  last_updated_at   DateTime      @updatedAt @map("last_updated_at")
-  created_at        DateTime      @default(now()) @map("created_at")
-
-  feedback_list Feedback[] @relation("ProjectFeedback")
+  id                  String     @id @default(uuid())
+  title               String     @unique // Assuming project titles should be unique
+  subtitle            String
+  ministry_id         String? // References a mock data ID for now
+  state_id            String? // References a mock data ID for now
+  status              String // e.g., 'Ongoing', 'Completed', 'Planned', 'On Hold'
+  start_date          DateTime   @default(now()) @map("start_date")
+  expected_end_date   DateTime?  @map("expected_end_date")
+  actual_end_date     DateTime?  @map("actual_end_date")
+  description         String     @db.Text
+  images              Json?      // Store as JSON: { url: string, alt: string, dataAiHint?: string }[]
+  videos              Json?      // Store as JSON: { title: string, url: string, thumbnailUrl?: string }[]
+  impact_stats        Json?      // Store as JSON: { label: string, value: string, iconName?: string }[]
+  budget              Float?     // Using Float for monetary values
+  expenditure         Float?     // Using Float for monetary values
+  tags                String[]   @default([])
+  last_updated_at     DateTime   @updatedAt @map("last_updated_at")
+  created_at          DateTime   @default(now()) @map("created_at")
+  feedback_list       Feedback[] @relation("ProjectFeedback")
 
   @@map("projects")
 }
 
-enum ProjectStatus {
-  PLANNED
-  ONGOING
-  COMPLETED
-  ON_HOLD
-
-  @@map("project_status")
-}
-
 model Feedback {
-  id                String    @id @default(uuid())
-  project_id        String    @map("project_id")
-  user_id           String?   @map("user_id")
-  user_name         String    @map("user_name")
-  comment           String    @db.Text
+  id                String   @id @default(uuid())
+  project_id        String   @map("project_id")
+  user_id           String?  @map("user_id") // Nullable if feedback can be anonymous or user deleted
+  user_name         String   @map("user_name")
+  comment           String   @db.Text
   rating            Int?
-  sentiment_summary String?   @map("sentiment_summary")
-  created_at        DateTime  @default(now()) @map("created_at")
+  sentiment_summary String?  @map("sentiment_summary") @db.Text
+  created_at        DateTime @default(now()) @map("created_at")
 
-  project Project? @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
-  user    User?    @relation(fields: [user_id], references: [id], onDelete: SetNull) // Set user_id to NULL if user is deleted
+  project Project @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull) // SetNull if user is deleted
 
-  @@index([project_id])
-  @@index([user_id])
   @@map("feedback")
 }
 
 model NewsArticle {
-  id             String    @id @default(uuid())
-  slug           String    @unique
-  title          String
-  summary        String    @db.Text
-  imageUrl       String?   @map("image_url")
-  dataAiHint     String?   @map("data_ai_hint")
-  category       String
-  publishedDate  DateTime  @map("published_date")
-  content        String    @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  slug          String   @unique
+  title         String
+  summary       String   @db.Text
+  imageUrl      String?  @map("image_url")
+  dataAiHint    String?  @map("data_ai_hint")
+  category      String
+  publishedDate DateTime @map("published_date")
+  content       String   @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("news_articles")
 }
 
 model Service {
-  id          String    @id @default(uuid())
-  slug        String    @unique
+  id          String   @id @default(uuid())
+  slug        String   @unique
   title       String
-  summary     String    @db.Text
-  iconName    String?   @map("icon_name")
+  summary     String   @db.Text
+  iconName    String?  @map("icon_name")
   link        String?
   category    String
-  imageUrl    String?   @map("image_url")
-  dataAiHint  String?   @map("data_ai_hint")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  imageUrl    String?  @map("image_url")
+  dataAiHint  String?  @map("data_ai_hint")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("services")
 }
@@ -161,7 +142,7 @@ model Service {
 model Video {
   id            String    @id @default(uuid())
   title         String
-  url           String    // YouTube embed URL or similar
+  url           String
   thumbnailUrl  String?   @map("thumbnail_url")
   dataAiHint    String?   @map("data_ai_hint")
   description   String?   @db.Text
