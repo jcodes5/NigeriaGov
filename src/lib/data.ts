@@ -525,7 +525,7 @@ export const updateServiceInDb = async (id: string, serviceData: Partial<Service
         iconName: serviceData.iconName === '' ? null : serviceData.iconName,
         link: serviceData.link === '' ? null : serviceData.link,
         imageUrl: serviceData.imageUrl === '' ? null : serviceData.imageUrl,
-        dataAiHint: serviceData.dataAiHint === '' ? null : serviceData.dataAiHint,
+        dataAiHint: serviceData.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
       },
     });
     return mapPrismaServiceToAppServiceItem(updatedService);
@@ -554,3 +554,5 @@ export const mockFeaturedVideos: Video[] = [
   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
 ];
+
+    

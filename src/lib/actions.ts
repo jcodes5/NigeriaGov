@@ -467,3 +467,5 @@ export async function fetchAllProjectsAction(): Promise<AppProject[]> {
     throw new Error("Failed to fetch projects via action."); // Or throw an error
   }
 }
+
+    

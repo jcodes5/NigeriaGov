@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, UserPlus, Trash2, Users as UsersIcon, Edit } from "lucide-react"; // Added UsersIcon and Edit
+import { MoreHorizontal, UserPlus, Trash2, Users as UsersIcon, Edit } from "lucide-react"; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -247,3 +247,5 @@ export default function ManageUsersPage() {
     </div>
   );
 }
+
+    
