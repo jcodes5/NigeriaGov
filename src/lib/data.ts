@@ -163,9 +163,6 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
 
 export type ProjectCreationData = Omit<PrismaProject, 'id' | 'created_at' | 'last_updated_at' | 'images' | 'videos' | 'impact_stats' | 'feedback_list'> & {
   tags?: string[];
-  // Added to allow passing these as potentially undefined in the creation process,
-  // as they are complex types (Json) that the simple form doesn't handle yet.
-  // The DB schema allows them to be null.
   images?: any;
   videos?: any;
   impact_stats?: any;
@@ -193,14 +190,12 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
 export const updateProjectInDb = async (id: string, projectData: Partial<ProjectCreationData>): Promise<AppProject | null> => {
   try {
     const dataToUpdate = { ...projectData };
-    // Convert date strings to Date objects if they are strings
     if (dataToUpdate.start_date && typeof dataToUpdate.start_date === 'string') {
       dataToUpdate.start_date = new Date(dataToUpdate.start_date);
     }
     if (dataToUpdate.expected_end_date && typeof dataToUpdate.expected_end_date === 'string') {
       dataToUpdate.expected_end_date = new Date(dataToUpdate.expected_end_date);
     }
-    // Ensure nullable fields are handled correctly
     const budget = dataToUpdate.budget === undefined ? null : Number(dataToUpdate.budget);
     const expenditure = dataToUpdate.expenditure === undefined ? null : Number(dataToUpdate.expenditure);
 
@@ -211,8 +206,6 @@ export const updateProjectInDb = async (id: string, projectData: Partial<Project
         ...dataToUpdate,
         budget: budget,
         expenditure: expenditure,
-        // Ensure complex fields are not accidentally overwritten if not provided
-        // images, videos, impact_stats are not updated via this simple form for now
       },
     });
     return mapPrismaProjectToAppProject(updatedProject);
@@ -224,11 +217,9 @@ export const updateProjectInDb = async (id: string, projectData: Partial<Project
 
 export const deleteProjectFromDb = async (id: string): Promise<boolean> => {
   try {
-    // First, delete related feedback to avoid foreign key constraint issues
     await prisma.feedback.deleteMany({
       where: { project_id: id },
     });
-    // Then, delete the project
     await prisma.project.delete({
       where: { id },
     });
@@ -300,16 +291,18 @@ export async function getUsers(): Promise<AppUser[]> {
 
 export async function deleteUserById(userId: string): Promise<{ success: boolean; error?: any }> {
   try {
+     // Disassociate feedback from the user instead of deleting the feedback
      await prisma.feedback.updateMany({
       where: { user_id: userId },
-      data: { user_id: null }, // Or delete them if preferred: await prisma.feedback.deleteMany({ where: { user_id: userId }})
+      data: { user_id: null }, 
     });
+    // Delete the user profile
     await prisma.user.delete({
       where: { id: userId },
     });
     return { success: true };
   } catch (error) {
-    console.error('Error deleting user with Prisma:', error);
+    console.error('Error deleting user profile or disassociating feedback with Prisma:', error);
     return { success: false, error };
   }
 }
@@ -321,17 +314,15 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
     });
 
     if (existingUser) {
-      // User profile already exists, update if necessary
       const dataToUpdate: { name?: string | null; avatar_url?: string | null } = {};
       let needsUpdate = false;
 
-      if (userData.name !== existingUser.name && userData.name !== undefined) {
+      if (userData.name !== undefined && userData.name !== existingUser.name) {
         dataToUpdate.name = userData.name;
         needsUpdate = true;
       }
-      // Ensure avatar_url is only updated if a new value is provided, not if userData.avatar_url is undefined
       if (userData.avatar_url !== undefined && userData.avatar_url !== existingUser.avatar_url) {
-        dataToUpdate.avatar_url = userData.avatar_url; // This can be null if explicitly passed as null
+        dataToUpdate.avatar_url = userData.avatar_url;
         needsUpdate = true;
       }
 
@@ -342,15 +333,14 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
         });
         return mapPrismaUserToAppUser(updatedUser);
       }
-      return mapPrismaUserToAppUser(existingUser); // Return existing if no update needed
+      return mapPrismaUserToAppUser(existingUser);
     } else {
-      // User profile does not exist, create it
       const newUser = await prisma.user.create({
         data: {
           id: userData.id,
           name: userData.name,
           email: userData.email,
-          role: userData.role || 'user', // Default role
+          role: userData.role || 'user', 
           avatar_url: userData.avatar_url,
         },
       });
@@ -358,7 +348,6 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
     }
   } catch (error) {
     console.error('Error in createUserProfileInDb:', error);
-    // Rethrow the error so the calling server action can handle it (e.g., check for P2002 on email)
     throw error;
   }
 }
@@ -436,7 +425,6 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
 export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsArticleCreationData>): Promise<AppNewsArticle | null> => {
   try {
     const dataToUpdate = { ...newsData };
-    // Convert date string to Date object if necessary
     if (dataToUpdate.publishedDate && typeof dataToUpdate.publishedDate === 'string') {
       dataToUpdate.publishedDate = new Date(dataToUpdate.publishedDate);
     }
@@ -445,7 +433,6 @@ export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsAr
       where: { id },
       data: {
         ...dataToUpdate,
-        // Ensure optional fields are set to null if empty string is passed
         imageUrl: dataToUpdate.imageUrl === '' ? null : dataToUpdate.imageUrl,
         dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
       },

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, UserPlus, Trash2 } from "lucide-react";
+import { MoreHorizontal, UserPlus, Trash2, Users as UsersIcon, Edit } from "lucide-react"; // Added UsersIcon and Edit
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,11 +25,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useEffect, useState, useTransition, useCallback } from "react";
-import type { User as AppUser } from "@/types"; // Renamed to AppUser
+import type { User as AppUser } from "@/types";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getUsers as fetchUsersFromDB } from "@/lib/data";
-import { deleteUser as deleteUserAction } from "@/lib/actions"; // Renamed server action import
+import { deleteUser as deleteUserAction } from "@/lib/actions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ManageUsersPage() {
   const { profile: currentUserProfile, isAdmin, isLoading: authLoading } = useAuth();
@@ -41,18 +42,20 @@ export default function ManageUsersPage() {
   const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
 
   const loadUsers = useCallback(async () => {
-    setIsLoadingData(true);
-    try {
-      const allUsers = await fetchUsersFromDB();
-      setUsers(allUsers);
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-      toast({ title: "Error", description: "Failed to load user data.", variant: "destructive" });
-      setUsers([]);
-    } finally {
-      setIsLoadingData(false);
+    if (isAdmin) {
+      setIsLoadingData(true);
+      try {
+        const allUsers = await fetchUsersFromDB();
+        setUsers(allUsers);
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+        toast({ title: "Error", description: "Failed to load user data.", variant: "destructive" });
+        setUsers([]);
+      } finally {
+        setIsLoadingData(false);
+      }
     }
-  }, [toast]);
+  }, [isAdmin, toast]);
 
 
   useEffect(() => {
@@ -69,24 +72,17 @@ export default function ManageUsersPage() {
   const handleDeleteUser = async () => {
     if (!userToDelete || !userToDelete.id) return;
 
-    if (userToDelete.id === currentUserProfile?.id && currentUserProfile?.role === 'admin') {
+    if (userToDelete.id === currentUserProfile?.id) {
       toast({
         title: "Action Denied",
-        description: "You cannot delete your own admin account.",
+        description: "Administrators cannot delete their own profiles from this interface.",
         variant: "destructive",
       });
       setUserToDelete(null);
       return;
     }
     
-    // Deletion of Supabase auth user itself is more complex and requires admin privileges on Supabase.
-    // This action primarily deletes from the public 'users' table.
-    // Add specific checks if there are critical users you don't want deleted from public.users
-    // e.g. if (userToDelete.email === "superadmin@example.com") { ... }
-
-
     startTransition(async () => {
-      // Call the renamed server action
       const result = await deleteUserAction(userToDelete.id!); 
       if (result.success) {
         setUsers((prevUsers) => prevUsers.filter((u) => u.id !== userToDelete.id));
@@ -102,14 +98,43 @@ export default function ManageUsersPage() {
 
   if (overallLoading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">{authLoading ? "Verifying admin access..." : "Loading user data..."}</p>
+      <div className="space-y-8">
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <Skeleton className="h-8 w-1/2" />
+              <Skeleton className="h-4 w-3/4 mt-1" />
+            </div>
+            <Skeleton className="h-10 w-40" /> 
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardContent className="p-0">
+             <Table>
+              <TableHeader>
+                <TableRow>
+                  {[...Array(5)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...Array(3)].map((_, i) => (
+                  <TableRow key={i}>
+                    {[...Array(5)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+         <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <p className="ml-3 text-lg">{authLoading ? "Verifying admin access..." : "Loading user data..."}</p>
+        </div>
       </div>
     );
   }
   
-  if (!isAdmin && !authLoading) { // Fallback if useEffect redirect fails
+  if (!isAdmin && !authLoading) { 
       return null; 
   }
 
@@ -119,10 +144,10 @@ export default function ManageUsersPage() {
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle className="font-headline text-2xl">Manage Users</CardTitle>
+            <CardTitle className="font-headline text-2xl flex items-center"><UsersIcon className="mr-2 h-6 w-6"/>Manage Users</CardTitle>
             <CardDescription>View, edit, and manage user profiles from the database.</CardDescription>
           </div>
-          <Button className="button-hover w-full sm:w-auto">
+          <Button className="button-hover w-full sm:w-auto" disabled>
             <UserPlus className="mr-2 h-4 w-4" /> Add New User (Coming Soon)
           </Button>
         </CardHeader>
@@ -169,7 +194,7 @@ export default function ManageUsersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled={isPending}>Edit User (Coming Soon)</DropdownMenuItem>
+                          <DropdownMenuItem disabled> <Edit className="mr-2 h-4 w-4" /> Edit User (Coming Soon)</DropdownMenuItem>
                           <DropdownMenuItem disabled={isPending || user.id === currentUserProfile?.id}>
                             {user.role === 'user' ? 'Make Admin (Coming Soon)' : 'Make User (Coming Soon)'}
                           </DropdownMenuItem>
@@ -179,7 +204,7 @@ export default function ManageUsersPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setUserToDelete(user)}
-                            className="text-destructive"
+                            className="text-destructive focus:bg-destructive/20 focus:text-destructive-foreground"
                             disabled={isPending || user.id === currentUserProfile?.id}
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete User Profile
@@ -199,9 +224,9 @@ export default function ManageUsersPage() {
         <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will delete the user profile for "{userToDelete.name || userToDelete.email}" from the public user table. This does not automatically delete their Supabase authentication account. Are you sure you want to proceed?
+                This action will delete the user profile for &quot;{userToDelete.name || userToDelete.email}&quot; from the application&apos;s user table. This disassociates their feedback but does NOT automatically delete their Supabase authentication account.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -213,7 +238,7 @@ export default function ManageUsersPage() {
                 disabled={isPending}
                 className="bg-destructive hover:bg-destructive/90"
               >
-                {isPending ? "Deleting..." : "Delete Profile"}
+                {isPending ? "Deleting Profile..." : "Yes, Delete Profile"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
