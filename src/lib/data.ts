@@ -1,5 +1,5 @@
 
-import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem, ProjectFormData } from '@/types';
+import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video as AppVideo, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, ProjectFormData } from '@/types';
 import * as LucideIcons from 'lucide-react';
 import prisma from './prisma';
 import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo } from '@prisma/client';
@@ -49,7 +49,7 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     actualEndDate: prismaProject.actual_end_date ? new Date(prismaProject.actual_end_date) : undefined,
     description: prismaProject.description,
     images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
-    videos: (prismaProject.videos as unknown as Video[] || []),
+    videos: (prismaProject.videos as unknown as AppVideo[] || []),
     impactStats: mappedImpactStats,
     budget: prismaProject.budget ? Number(prismaProject.budget) : undefined,
     expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined,
@@ -105,7 +105,7 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
 };
 
 // --- Helper function to map Prisma Service to AppServiceItem ---
-const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): ServiceItem => {
+const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): AppServiceItem => {
   const IconComponent = prismaService.iconName && LucideIcons[prismaService.iconName as keyof typeof LucideIcons]
     ? LucideIcons[prismaService.iconName as keyof typeof LucideIcons]
     : LucideIcons.Server; // Default icon
@@ -127,7 +127,7 @@ const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): Service
 };
 
 // --- Helper function to map Prisma Video to AppVideo ---
-const mapPrismaVideoToAppVideo = (prismaVideo: PrismaVideo): Video => {
+const mapPrismaVideoToAppVideo = (prismaVideo: PrismaVideo): AppVideo => {
   return {
     id: prismaVideo.id,
     title: prismaVideo.title,
@@ -472,7 +472,7 @@ export const deleteNewsArticleFromDb = async (id: string): Promise<boolean> => {
 
 
 // --- Services Data Functions (Prisma Integrated) ---
-export const getAllServices = async (): Promise<ServiceItem[]> => {
+export const getAllServices = async (): Promise<AppServiceItem[]> => {
   try {
     const prismaServices = await prisma.service.findMany({
       orderBy: {
@@ -486,7 +486,7 @@ export const getAllServices = async (): Promise<ServiceItem[]> => {
   }
 };
 
-export const getServiceBySlug = async (slug: string): Promise<ServiceItem | undefined> => {
+export const getServiceBySlug = async (slug: string): Promise<AppServiceItem | undefined> => {
   try {
     const prismaService = await prisma.service.findUnique({
       where: { slug },
@@ -498,7 +498,7 @@ export const getServiceBySlug = async (slug: string): Promise<ServiceItem | unde
   }
 };
 
-export const getServiceById = async (id: string): Promise<ServiceItem | null> => {
+export const getServiceById = async (id: string): Promise<AppServiceItem | null> => {
   try {
     const service = await prisma.service.findUnique({
       where: { id },
@@ -512,7 +512,7 @@ export const getServiceById = async (id: string): Promise<ServiceItem | null> =>
 
 export type ServiceCreationData = Omit<PrismaService, 'id' | 'createdAt' | 'updatedAt'>;
 
-export const createServiceInDb = async (serviceData: ServiceCreationData): Promise<ServiceItem | null> => {
+export const createServiceInDb = async (serviceData: ServiceCreationData): Promise<AppServiceItem | null> => {
   try {
     const newService = await prisma.service.create({
       data: {
@@ -530,9 +530,9 @@ export const createServiceInDb = async (serviceData: ServiceCreationData): Promi
   }
 };
 
-export const updateServiceInDb = async (id: string, serviceData: Partial<ServiceCreationData>): Promise<ServiceItem | null> => {
+export const updateServiceInDb = async (id: string, serviceData: Partial<ServiceCreationData>): Promise<AppServiceItem | null> => {
   try {
-    const dataToUpdate = {...serviceData}; // Create a mutable copy
+    const dataToUpdate = {...serviceData}; 
     const updatedService = await prisma.service.update({
       where: { id },
       data: {
@@ -563,7 +563,7 @@ export const deleteServiceFromDb = async (id: string): Promise<boolean> => {
 };
 
 // --- Video Data Functions (Prisma Integrated) ---
-export const getAllVideosFromDb = async (): Promise<Video[]> => {
+export const getAllVideosFromDb = async (): Promise<AppVideo[]> => {
   try {
     const prismaVideos = await prisma.video.findMany({
       orderBy: {
@@ -577,12 +577,64 @@ export const getAllVideosFromDb = async (): Promise<Video[]> => {
   }
 };
 
+export const getVideoById = async (id: string): Promise<AppVideo | null> => {
+  try {
+    const video = await prisma.video.findUnique({
+      where: { id },
+    });
+    return video ? mapPrismaVideoToAppVideo(video) : null;
+  } catch (error) {
+    console.error(`Error fetching video by ID "${id}" with Prisma:`, error);
+    return null;
+  }
+};
 
-// --- Mock Data (to be phased out as features are migrated) ---
-// export const mockFeaturedVideos: Video[] = [
-//   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
-//   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
-//   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
-// ];
-// Commented out as we are now fetching from DB
-    
+export type VideoCreationData = Omit<PrismaVideo, 'id' | 'createdAt' | 'updatedAt'>;
+
+export const createVideoInDb = async (videoData: VideoCreationData): Promise<AppVideo | null> => {
+  try {
+    const newVideo = await prisma.video.create({
+      data: {
+        ...videoData,
+        thumbnailUrl: videoData.thumbnailUrl || null,
+        dataAiHint: videoData.dataAiHint || null,
+        description: videoData.description || null,
+      }
+    });
+    return mapPrismaVideoToAppVideo(newVideo);
+  } catch (error) {
+    console.error('Error creating video in DB with Prisma:', error);
+    return null;
+  }
+};
+
+export const updateVideoInDb = async (id: string, videoData: Partial<VideoCreationData>): Promise<AppVideo | null> => {
+  try {
+    const dataToUpdate = { ...videoData };
+    const updatedVideo = await prisma.video.update({
+      where: { id },
+      data: {
+        ...dataToUpdate,
+        thumbnailUrl: dataToUpdate.thumbnailUrl === '' ? null : dataToUpdate.thumbnailUrl,
+        dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
+        description: dataToUpdate.description === '' ? null : dataToUpdate.description,
+      },
+    });
+    return mapPrismaVideoToAppVideo(updatedVideo);
+  } catch (error) {
+    console.error(`Error updating video with ID "${id}" in DB with Prisma:`, error);
+    return null;
+  }
+};
+
+export const deleteVideoFromDb = async (id: string): Promise<boolean> => {
+  try {
+    await prisma.video.delete({
+      where: { id },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting video with ID "${id}" from DB with Prisma:`, error);
+    return false;
+  }
+};

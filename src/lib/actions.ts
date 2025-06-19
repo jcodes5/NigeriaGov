@@ -11,7 +11,7 @@ import {
   createProjectInDb as saveProjectToDb, 
   updateProjectInDb,
   deleteProjectFromDb,
-  getAllProjects as fetchAllProjectsFromDb, // Alias to avoid name clash
+  getAllProjects as fetchAllProjectsFromDb, 
   type ProjectCreationData,
   createNewsArticleInDb as saveNewsArticleToDb, 
   type NewsArticleCreationData,
@@ -21,9 +21,12 @@ import {
   type ServiceCreationData,
   updateServiceInDb,
   deleteServiceFromDb,
-  getServiceById as getServiceFromDb,
+  createVideoInDb as saveVideoToDb,
+  type VideoCreationData,
+  updateVideoInDb,
+  deleteVideoFromDb,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, NewsArticleFormData, ProjectFormData, ServiceFormData } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData } from '@/types';
 import prisma from './prisma';
 
 
@@ -144,7 +147,6 @@ export async function getUserProfile(userId: string): Promise<AppUser | null> {
   }
 }
 
-// Server Action Result Type
 interface ActionResult<T = null> {
   success: boolean;
   message: string;
@@ -168,7 +170,6 @@ export async function addProject(
       budget: formData.budget,
       expenditure: formData.expenditure,
       tags: formData.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
-      // Initialize complex fields as empty or default if not handled by form
       images: [], 
       videos: [],
       impact_stats: [],
@@ -379,7 +380,7 @@ export async function addService(
     }
 
     revalidatePath('/services');
-    revalidatePath(`/services/${newService.slug}`); // If individual service pages exist
+    revalidatePath(`/services/${newService.slug}`);
     revalidatePath('/dashboard/admin/manage-services');
     revalidatePath('/');
     return { success: true, message: 'Service added successfully!', item: newService };
@@ -423,7 +424,7 @@ export async function updateService(
     }
 
     revalidatePath('/services');
-    revalidatePath(`/services/${updatedService.slug}`); // If individual service pages exist
+    revalidatePath(`/services/${updatedService.slug}`);
     revalidatePath('/dashboard/admin/manage-services');
     revalidatePath('/');
     return { success: true, message: 'Service updated successfully!', item: updatedService };
@@ -462,10 +463,81 @@ export async function fetchAllProjectsAction(): Promise<AppProject[]> {
     return await fetchAllProjectsFromDb();
   } catch (error) {
     console.error("Error fetching all projects in action:", error);
-    // Depending on how you want to handle errors on the client:
-    // return []; // Return empty array
-    throw new Error("Failed to fetch projects via action."); // Or throw an error
+    throw new Error("Failed to fetch projects via action.");
   }
 }
 
-    
+export async function addVideo(
+  videoData: VideoFormData
+): Promise<ActionResult<AppVideo>> {
+  try {
+    const dataToSave: VideoCreationData = {
+      ...videoData,
+      thumbnailUrl: videoData.thumbnailUrl || null,
+      dataAiHint: videoData.dataAiHint || null,
+      description: videoData.description || null,
+    };
+
+    const newVideo = await saveVideoToDb(dataToSave);
+    if (!newVideo) {
+      return { success: false, message: 'Failed to save video to the database.' };
+    }
+
+    revalidatePath('/dashboard/admin/manage-videos');
+    revalidatePath('/'); // Videos might appear on homepage
+    return { success: true, message: 'Video added successfully!', item: newVideo };
+  } catch (error) {
+    console.error('Error adding video:', error);
+    let errorMessage = 'An unexpected error occurred while adding the video.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function updateVideo(
+  id: string,
+  videoData: VideoFormData
+): Promise<ActionResult<AppVideo>> {
+  try {
+    const dataToUpdate: Partial<VideoCreationData> = {
+      ...videoData,
+      thumbnailUrl: videoData.thumbnailUrl || null,
+      dataAiHint: videoData.dataAiHint || null,
+      description: videoData.description || null,
+    };
+
+    const updatedVideo = await updateVideoInDb(id, dataToUpdate);
+    if (!updatedVideo) {
+      return { success: false, message: 'Failed to update video in the database.' };
+    }
+
+    revalidatePath('/dashboard/admin/manage-videos');
+    revalidatePath('/');
+    return { success: true, message: 'Video updated successfully!', item: updatedVideo };
+  } catch (error) {
+    console.error('Error updating video:', error);
+    let errorMessage = 'An unexpected error occurred while updating the video.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function deleteVideo(id: string): Promise<ActionResult> {
+  try {
+    const success = await deleteVideoFromDb(id);
+    if (!success) {
+      return { success: false, message: 'Failed to delete video from the database.' };
+    }
+
+    revalidatePath('/dashboard/admin/manage-videos');
+    revalidatePath('/');
+    return { success: true, message: 'Video deleted successfully!' };
+  } catch (error) {
+    console.error('Error deleting video:', error);
+    return { success: false, message: 'An unexpected error occurred while deleting the video.', errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}

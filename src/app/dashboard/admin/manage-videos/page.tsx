@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-// import { deleteVideo } from "@/lib/actions"; // To be added later
+import { deleteVideo } from "@/lib/actions"; 
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,8 +34,8 @@ export default function ManageVideosPage() {
   const { toast } = useToast();
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isDeleting, startDeleteTransition] = useTransition(); // For delete loading state
-  const [videoToDelete, setVideoToDelete] = useState<Video | null>(null); // For delete confirmation
+  const [isDeleting, startDeleteTransition] = useTransition(); 
+  const [videoToDelete, setVideoToDelete] = useState<Video | null>(null); 
 
   const fetchAdminVideos = React.useCallback(async () => {
     if (!authLoading) {
@@ -65,19 +65,16 @@ export default function ManageVideosPage() {
   
   const handleDeleteVideo = async () => {
     if (!videoToDelete) return;
-    // startDeleteTransition(async () => {
-    //   const result = await deleteVideo(videoToDelete.id); // Assuming deleteVideo action exists
-    //   if (result.success) {
-    //     toast({ title: "Video Deleted", description: result.message });
-    //     setVideos((prevVideos) => prevVideos.filter((v) => v.id !== videoToDelete.id));
-    //   } else {
-    //     toast({ title: "Error", description: result.message, variant: "destructive" });
-    //   }
-    //   setVideoToDelete(null);
-    // });
-    toast({ title: "Delete (Coming Soon)", description: `Simulating delete for video: ${videoToDelete.title}`});
-    console.log("Simulating delete for video:", videoToDelete);
-    setVideoToDelete(null); // Close dialog
+    startDeleteTransition(async () => {
+      const result = await deleteVideo(videoToDelete.id); 
+      if (result.success) {
+        toast({ title: "Video Deleted", description: result.message });
+        setVideos((prevVideos) => prevVideos.filter((v) => v.id !== videoToDelete.id));
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+      setVideoToDelete(null);
+    });
   };
 
 
@@ -134,10 +131,10 @@ export default function ManageVideosPage() {
             <CardTitle className="font-headline text-2xl flex items-center"><PlayCircleIcon className="mr-2 h-6 w-6"/>Manage Videos</CardTitle>
             <CardDescription>Add, edit, and manage video content for the platform.</CardDescription>
           </div>
-          <Button asChild className="button-hover w-full sm:w-auto" disabled> 
-            {/* <Link href="/dashboard/admin/manage-videos/add"> */}
-              <PlusCircle className="mr-2 h-4 w-4"/> Add New Video (Coming Soon)
-            {/* </Link> */}
+          <Button asChild className="button-hover w-full sm:w-auto"> 
+            <Link href="/dashboard/admin/manage-videos/add">
+              <PlusCircle className="mr-2 h-4 w-4"/> Add New Video
+            </Link>
           </Button>
         </CardHeader>
       </Card>
@@ -188,7 +185,11 @@ export default function ManageVideosPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled> <Edit className="mr-2 h-4 w-4" /> Edit Video (Coming Soon)</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/admin/manage-videos/edit/${video.id}`}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit Video
+                            </Link>
+                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                              <a href={video.url} target="_blank" rel="noopener noreferrer">View Video</a>
                           </DropdownMenuItem>
@@ -196,9 +197,9 @@ export default function ManageVideosPage() {
                           <DropdownMenuItem 
                             onClick={() => setVideoToDelete(video)} 
                             className="text-destructive"
-                            disabled // Temporarily disable delete until action is ready
+                            disabled={isDeleting}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete Video (Coming Soon)
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Video
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -228,7 +229,7 @@ export default function ManageVideosPage() {
                 disabled={isDeleting}
                 className="bg-destructive hover:bg-destructive/90"
               >
-                {isDeleting ? "Deleting..." : "Delete Video (Coming Soon)"}
+                {isDeleting ? "Deleting..." : "Delete Video"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

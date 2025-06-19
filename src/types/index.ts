@@ -185,10 +185,17 @@ export type ServiceFormData = {
   link?: string | null;
   imageUrl?: string | null;
   dataAiHint?: string | null;
-  iconName?: string | null;
+  iconName?: keyof typeof LucideIcons | null;
 };
 
-// Video Type (already defined above, but good to ensure PrismaVideo is imported if needed for raw types)
+export const videoFormSchemaRaw = {
+  title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(200),
+  url: (z: any) => z.string().url("Must be a valid embeddable URL (e.g., YouTube embed link)."),
+  thumbnailUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  dataAiHint: (z: any) => z.string().max(50, "AI hint for thumbnail too long (max 2 words).").optional().nullable(),
+  description: (z: any) => z.string().max(500, "Description too long.").optional().nullable(),
+};
+
 export type VideoFormData = {
   title: string;
   url: string;
