@@ -1,5 +1,5 @@
 
-import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo, SiteSetting as PrismaSiteSetting } from '@prisma/client';
+import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo, SiteSetting as PrismaSiteSetting, User as PrismaUser } from '@prisma/client';
 import type * as LucideIcons from 'lucide-react';
 
 
@@ -36,7 +36,7 @@ export interface ImpactStat {
 export interface Video {
   id: string;
   title: string;
-  url: string; // Should be the embeddable URL
+  url: string; 
   thumbnailUrl?: string | null;
   description?: string | null;
   dataAiHint?: string | null;
@@ -67,15 +67,18 @@ export interface Project {
   state_id?: string | null;
 }
 
-
+// Updated User type for NextAuth.js compatibility
 export interface User {
   id: string;
-  name: string | null;
-  email: string | null;
-  role: 'user' | 'admin' | null;
-  avatarUrl?: string | null;
-  created_at?: string | null; 
+  name?: string | null;
+  email?: string | null;
+  emailVerified?: Date | null; // NextAuth.js uses DateTime for this
+  image?: string | null;       // NextAuth.js uses 'image' instead of 'avatarUrl'
+  role?: 'user' | 'admin' | null; // Kept from original
+  created_at?: string | null;  // Kept from original (string to match existing pattern, Prisma handles Date)
+  // sessions and accounts are typically managed by NextAuth.js internally and might not be directly exposed here unless needed.
 }
+
 
 export interface NewsArticle {
   id: string;
@@ -212,5 +215,3 @@ export interface SiteSettings {
   footerMessage: string | null;
   updatedAt: Date;
 }
-
-    

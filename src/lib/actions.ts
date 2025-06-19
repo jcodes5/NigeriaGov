@@ -6,7 +6,7 @@ import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from
 import { 
   addFeedbackToProject as saveFeedbackToDb, 
   deleteUserById as removeUserFromDb,
-  createUserProfileInDb,
+  // createUserProfileInDb, // This is now handled by NextAuth Prisma Adapter
   getUserProfileFromDb,
   createProjectInDb as saveProjectToDb, 
   updateProjectInDb,
@@ -96,7 +96,7 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
 
     if (success) {
       revalidatePath("/dashboard/admin/manage-users");
-      return { success: true, message: "User profile deleted successfully from public table." };
+      return { success: true, message: "User profile deleted successfully." };
     } else {
       console.error("Prisma delete error (public.users):", error);
       return { success: false, message: `Failed to delete user profile: ${error?.message || 'Unknown error'}` };
@@ -111,37 +111,14 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   }
 }
 
-export async function syncUserProfile(
-  data: { userId: string; email: string; name: string; avatarUrl?: string | null }
-): Promise<{ user: AppUser | null; error: string | null }> {
-  try {
-    const profile = await createUserProfileInDb({
-      id: data.userId,
-      email: data.email,
-      name: data.name,
-      role: 'user', 
-      avatar_url: data.avatarUrl || null,
-    });
-    if (profile) {
-      return { user: profile, error: null };
-    }
-    return { user: null, error: "Failed to create user profile." };
-  } catch (error) {
-    console.error("Error syncing user profile:", error);
-    if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('email')) {
-      return { user: null, error: "A user with this email may already exist. If this is you, try logging in." };
-    }
-     if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('PRIMARY')) {
-      const existingUser = await getUserProfileFromDb(data.userId);
-      if (existingUser) return { user: existingUser, error: null }; 
-      return { user: null, error: "User profile already exists, but could not be retrieved." };
-    }
-    return { user: null, error: error instanceof Error ? error.message : "An unknown error occurred during profile sync." };
-  }
-}
+// syncUserProfile is no longer needed as NextAuth.js Prisma adapter handles user creation.
+// export async function syncUserProfile(
+//   data: { userId: string; email: string; name: string; avatarUrl?: string | null }
+// ): Promise<{ user: AppUser | null; error: string | null }> { ... }
 
 export async function getUserProfile(userId: string): Promise<AppUser | null> {
   try {
+    // This now fetches the user based on the NextAuth.js compatible User model
     const profile = await getUserProfileFromDb(userId);
     return profile;
   } catch (error) {
@@ -487,7 +464,7 @@ export async function addVideo(
     }
 
     revalidatePath('/dashboard/admin/manage-videos');
-    revalidatePath('/'); // Videos might appear on homepage
+    revalidatePath('/'); 
     return { success: true, message: 'Video added successfully!', item: newVideo };
   } catch (error) {
     console.error('Error adding video:', error);
@@ -570,7 +547,6 @@ export async function fetchSiteSettingsAction(): Promise<SiteSettings | null> {
     return await getSiteSettingsFromDb();
   } catch (error) {
     console.error("Error fetching site settings via action:", error);
-    // Depending on how critical this is, you might throw or return null/default
     return null; 
   }
 }
@@ -589,8 +565,7 @@ export async function updateSiteSettingsAction(
     if (!updatedSettings) {
       return { success: false, message: 'Failed to save site settings to the database.' };
     }
-    // Revalidate paths that might display this info, e.g., footer in layout, contact page
-    revalidatePath('/'); // Broad revalidation for layout changes
+    revalidatePath('/'); 
     revalidatePath('/contact');
     revalidatePath('/dashboard/admin/site-settings');
 
@@ -604,5 +579,3 @@ export async function updateSiteSettingsAction(
     };
   }
 }
-
-    

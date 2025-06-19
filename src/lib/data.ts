@@ -75,15 +75,16 @@ const mapPrismaFeedbackToAppFeedback = (prismaFeedback: PrismaFeedback): AppFeed
   };
 };
 
-// --- Helper function to map Prisma User to AppUser ---
+// --- Helper function to map Prisma User to AppUser (NextAuth.js compatible) ---
 const mapPrismaUserToAppUser = (prismaUser: PrismaUser): AppUser => {
   return {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
-    role: prismaUser.role as AppUser['role'] | null,
-    avatarUrl: prismaUser.avatar_url,
-    created_at: prismaUser.created_at ? new Date(prismaUser.created_at).toISOString() : null,
+    emailVerified: prismaUser.emailVerified, // From NextAuth.js schema
+    image: prismaUser.image,                 // From NextAuth.js schema (replaces avatar_url)
+    role: prismaUser.role as AppUser['role'] | null, // Kept from original
+    created_at: prismaUser.created_at ? new Date(prismaUser.created_at).toISOString() : null, // Kept from original
   };
 };
 
@@ -320,6 +321,8 @@ export async function deleteUserById(userId: string): Promise<{ success: boolean
       where: { user_id: userId },
       data: { user_id: null }, 
     });
+    // With NextAuth.js and PrismaAdapter, related Accounts and Sessions are often set up with onDelete: Cascade
+    // So deleting the User in Prisma should cascade to accounts and sessions.
     await prisma.user.delete({
       where: { id: userId },
     });
@@ -330,52 +333,9 @@ export async function deleteUserById(userId: string): Promise<{ success: boolean
   }
 }
 
-export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_at' | 'updated_at' | 'avatar_url'> & { avatar_url?: string | null }): Promise<AppUser | null> {
-  try {
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userData.id },
-    });
-
-    if (existingUser) {
-      const dataToUpdate: { name?: string | null; avatar_url?: string | null } = {};
-      let needsUpdate = false;
-
-      if (userData.name !== undefined && userData.name !== existingUser.name) {
-        dataToUpdate.name = userData.name;
-        needsUpdate = true;
-      }
-      if (userData.avatar_url !== undefined && userData.avatar_url !== existingUser.avatar_url) {
-        dataToUpdate.avatar_url = userData.avatar_url;
-        needsUpdate = true;
-      }
-
-      if (needsUpdate) {
-        const updatedUser = await prisma.user.update({
-          where: { id: userData.id },
-          data: dataToUpdate,
-        });
-        return mapPrismaUserToAppUser(updatedUser);
-      }
-      return mapPrismaUserToAppUser(existingUser);
-    } else {
-      const newUser = await prisma.user.create({
-        data: {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-          role: userData.role || 'user', 
-          avatar_url: userData.avatar_url,
-        },
-      });
-      return mapPrismaUserToAppUser(newUser);
-    }
-  } catch (error) {
-    console.error('Error in createUserProfileInDb:', error);
-    throw error;
-  }
-}
-
-
+// This function's role changes with NextAuth.js.
+// The PrismaAdapter handles user creation/linking during OAuth or credential sign-in.
+// This might be used if you need to fetch a user profile directly by ID outside of session context.
 export async function getUserProfileFromDb(userId: string): Promise<AppUser | null> {
   try {
     const user = await prisma.user.findUnique({
@@ -659,7 +619,6 @@ export const getSiteSettingsFromDb = async (): Promise<SiteSettings | null> => {
     if (settings) {
       return mapPrismaSiteSettingToAppSiteSetting(settings);
     }
-    // If no settings found, return a default structure or null
     return { 
       id: SITE_SETTINGS_ID,
       siteName: "NigeriaGovHub",
@@ -670,7 +629,7 @@ export const getSiteSettingsFromDb = async (): Promise<SiteSettings | null> => {
     };
   } catch (error) {
     console.error("Error fetching site settings from DB:", error);
-    return null; // Or throw error, or return defaults
+    return null; 
   }
 };
 
@@ -697,5 +656,3 @@ export const updateSiteSettingsInDb = async (settingsData: Partial<Omit<SiteSett
     throw error;
   }
 };
-
-    
