@@ -10,6 +10,7 @@ import { Pagination } from '@/components/common/pagination';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"; // Added this line
 
 const ITEMS_PER_PAGE = 9;
 
@@ -161,3 +162,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
