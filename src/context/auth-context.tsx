@@ -29,15 +29,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("AuthProvider: onAuthStateChange event:", event, "session:", session);
         setSession(session);
         const currentSupabaseUser = session?.user ?? null;
         setAuthUser(currentSupabaseUser);
 
         if (currentSupabaseUser) {
-          // Fetch profile from our public users table
-          const userProfile = await getUserProfile(currentSupabaseUser.id);
-          setProfile(userProfile);
-          setIsAdmin(userProfile?.role === 'admin');
+          try {
+            const userProfile = await getUserProfile(currentSupabaseUser.id);
+            setProfile(userProfile);
+            setIsAdmin(userProfile?.role === 'admin');
+          } catch (profileError) {
+            console.error("AuthProvider: Error fetching user profile in onAuthStateChange:", profileError);
+            setProfile(null);
+            setIsAdmin(false);
+          }
         } else {
           setProfile(null);
           setIsAdmin(false);
@@ -48,7 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Initial check
     const checkInitialSession = async () => {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+      try {
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+            console.error("AuthProvider: Error fetching initial session from Supabase:", sessionError);
+            // If getSession fails, it might indicate a network issue or misconfiguration early on.
+            // We still set authUser to null and proceed, as onAuthStateChange might recover later
+            // or this indicates a persistent problem.
+            setAuthUser(null);
+            setProfile(null);
+            setIsAdmin(false);
+            setIsLoading(false);
+            return;
+        }
+        
+        console.log("AuthProvider: Initial session data:", initialSession);
         setSession(initialSession);
         const currentSupabaseUser = initialSession?.user ?? null;
         setAuthUser(currentSupabaseUser);
@@ -61,7 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfile(null);
             setIsAdmin(false);
         }
+      } catch (error) {
+        // Catch any other unexpected errors during initial session check
+        console.error("AuthProvider: Unexpected error during checkInitialSession:", error);
+        setAuthUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+      } finally {
         setIsLoading(false);
+      }
     };
     checkInitialSession();
 
@@ -73,17 +102,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     setIsLoading(true);
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("AuthProvider: Error during sign out:", error);
+      }
+    } catch (e) {
+      console.error("AuthProvider: Unexpected error during sign out:", e);
+    }
     setAuthUser(null);
     setProfile(null);
     setIsAdmin(false);
     setSession(null);
     setIsLoading(false);
-    // No need to remove from localStorage, Supabase client handles it
   };
   
-  // The login function is removed as auth state is now driven by Supabase events.
-  // Forms will call Supabase methods directly.
 
   return (
     <AuthContext.Provider value={{ authUser, profile, isAdmin, logout, isLoading, session }}>
@@ -99,3 +132,4 @@ export function useAuth() {
   }
   return context;
 }
+
