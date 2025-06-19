@@ -11,6 +11,7 @@ import {
   createProjectInDb as saveProjectToDb, 
   updateProjectInDb,
   deleteProjectFromDb,
+  getAllProjects as fetchAllProjectsFromDb, // Alias to avoid name clash
   type ProjectCreationData,
   createNewsArticleInDb as saveNewsArticleToDb, 
   type NewsArticleCreationData,
@@ -453,5 +454,16 @@ export async function deleteService(id: string): Promise<ActionResult> {
   } catch (error) {
     console.error('Error deleting service:', error);
     return { success: false, message: 'An unexpected error occurred while deleting the service.', errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function fetchAllProjectsAction(): Promise<AppProject[]> {
+  try {
+    return await fetchAllProjectsFromDb();
+  } catch (error) {
+    console.error("Error fetching all projects in action:", error);
+    // Depending on how you want to handle errors on the client:
+    // return []; // Return empty array
+    throw new Error("Failed to fetch projects via action."); // Or throw an error
   }
 }
