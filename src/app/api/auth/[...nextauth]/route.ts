@@ -2,12 +2,17 @@
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import prisma from '@/lib/prisma';
-import type { NextAuthConfig, User as NextAuthUser } from 'next-auth'; // Import User type from next-auth
+import type { NextAuthConfig, User as NextAuthUser } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from "next-auth/providers/google";
 import bcrypt from 'bcryptjs';
 
 // Define providers here as you add them
 const providers = [
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID as string,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+  }),
   CredentialsProvider({
     name: 'Credentials',
     credentials: {
@@ -24,7 +29,7 @@ const providers = [
       });
 
       if (!user || !user.password) {
-        // User not found or password not set (e.g., OAuth user)
+        // User not found or password not set (e.g., OAuth user trying credentials)
         throw new Error('Invalid email or password.');
       }
 
@@ -34,18 +39,15 @@ const providers = [
         throw new Error('Invalid email or password.');
       }
       
-      // Return user object that NextAuth expects
-      // Ensure this matches the shape expected by your session/jwt callbacks
       return {
         id: user.id,
         name: user.name,
         email: user.email,
         image: user.image,
-        role: user.role, // Custom property
+        role: user.role, 
       };
     }
   }),
-  // GoogleProvider will be added here
   // FacebookProvider will be added here
 ];
 
@@ -53,39 +55,31 @@ export const authOptions: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
   providers: providers,
   session: {
-    strategy: 'jwt', // Using JWT for session strategy
+    strategy: 'jwt', 
   },
   pages: {
-    signIn: '/login', // Custom login page
-    // error: '/auth/error', // Custom error page (optional)
-    // verifyRequest: '/auth/verify-request', // For Email provider (magic links)
+    signIn: '/login', 
+    // error: '/auth/error', 
+    // verifyRequest: '/auth/verify-request', 
   },
   callbacks: {
-    async jwt({ token, user }) {
-      // Persist user ID and role to the JWT
-      if (user) { // user object is available during sign-in
+    async jwt({ token, user, account }) {
+      if (account && user) { // Persist user ID and role to the JWT
         token.id = user.id;
-        token.role = (user as any).role; // Cast if 'role' is not in NextAuthUser type
+        token.role = (user as any).role; 
       }
       return token;
     },
     async session({ session, token }) {
-      // Add user ID and role to the session object from the JWT
       if (token.id && session.user) {
         session.user.id = token.id as string;
       }
       if (token.role && session.user) {
-        (session.user as any).role = token.role; // Cast if 'role' is not in Session['user'] type
+        (session.user as any).role = token.role; 
       }
       return session;
     },
   },
-  // Events can be used for things like creating a user profile in your own tables
-  // if the adapter doesn't handle it exactly as you want, or for sending welcome emails.
-  // events: {
-  //   async signIn(message) { /* on successful sign in */ },
-  //   async createUser(message) { /* user created */ }
-  // }
 };
 
 const handler = NextAuth(authOptions);
