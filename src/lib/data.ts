@@ -1,8 +1,8 @@
 
 import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem, ProjectFormData } from '@/types';
-import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle, PersonStanding, Construction, CheckCircle, Zap } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import prisma from './prisma';
-import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle } from '@prisma/client';
+import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService } from '@prisma/client';
 
 // --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
@@ -33,22 +33,8 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
   const state = states.find(s => s.id === prismaProject.state_id) || { id: prismaProject.state_id || 'unknown_state', name: prismaProject.state_id || 'Unknown State' };
 
   const mappedImpactStats = (prismaProject.impact_stats as unknown as ImpactStat[] || []).map(stat => {
-    let iconComponent;
-    switch (stat.iconName) {
-      case 'Briefcase': iconComponent = Briefcase; break;
-      case 'Users': iconComponent = Users; break;
-      case 'DollarSign': iconComponent = DollarSign; break;
-      case 'TrendingUp': iconComponent = TrendingUp; break;
-      case 'MapPin': iconComponent = MapPin; break;
-      case 'CalendarDays': iconComponent = CalendarDays; break;
-      case 'Flag': iconComponent = Flag; break;
-      case 'PersonStanding': iconComponent = PersonStanding; break;
-      case 'Construction': iconComponent = Construction; break;
-      case 'CheckCircle': iconComponent = CheckCircle; break;
-      case 'Zap': iconComponent = Zap; break;
-      default: iconComponent = TrendingUp;
-    }
-    return { ...stat, icon: iconComponent };
+    const IconComponent = stat.iconName && LucideIcons[stat.iconName as keyof typeof LucideIcons] ? LucideIcons[stat.iconName as keyof typeof LucideIcons] : LucideIcons.TrendingUp;
+    return { ...stat, icon: IconComponent };
   });
 
   return {
@@ -108,13 +94,35 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
     slug: prismaNews.slug,
     title: prismaNews.title,
     summary: prismaNews.summary,
-    imageUrl: prismaNews.image_url, 
-    dataAiHint: prismaNews.data_ai_hint, 
+    imageUrl: prismaNews.imageUrl, 
+    dataAiHint: prismaNews.dataAiHint, 
     category: prismaNews.category,
-    publishedDate: new Date(prismaNews.published_date), 
+    publishedDate: new Date(prismaNews.publishedDate), 
     content: prismaNews.content,
-    createdAt: new Date(prismaNews.created_at),
-    updatedAt: new Date(prismaNews.updated_at),
+    createdAt: new Date(prismaNews.createdAt),
+    updatedAt: new Date(prismaNews.updatedAt),
+  };
+};
+
+// --- Helper function to map Prisma Service to AppServiceItem ---
+const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): ServiceItem => {
+  const IconComponent = prismaService.iconName && LucideIcons[prismaService.iconName as keyof typeof LucideIcons] 
+    ? LucideIcons[prismaService.iconName as keyof typeof LucideIcons] 
+    : LucideIcons.Server; // Default icon
+
+  return {
+    id: prismaService.id,
+    slug: prismaService.slug,
+    title: prismaService.title,
+    summary: prismaService.summary,
+    iconName: prismaService.iconName as keyof typeof LucideIcons || undefined,
+    icon: IconComponent,
+    link: prismaService.link,
+    category: prismaService.category,
+    imageUrl: prismaService.imageUrl,
+    dataAiHint: prismaService.dataAiHint,
+    createdAt: new Date(prismaService.createdAt),
+    updatedAt: new Date(prismaService.updatedAt),
   };
 };
 
@@ -164,9 +172,9 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
         ...projectData,
         budget: projectData.budget ?? undefined, 
         expenditure: projectData.expenditure ?? undefined,
-        images: [], 
-        videos: [], 
-        impact_stats: [], 
+        images: projectData.images || [], 
+        videos: projectData.videos || [], 
+        impact_stats: projectData.impact_stats || [], 
       },
     });
     return mapPrismaProjectToAppProject(newProject);
@@ -179,7 +187,6 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
 export const updateProjectInDb = async (id: string, projectData: Partial<ProjectCreationData>): Promise<AppProject | null> => {
   try {
     const dataToUpdate = { ...projectData };
-    // Ensure dates are Date objects if provided
     if (dataToUpdate.start_date && typeof dataToUpdate.start_date === 'string') {
       dataToUpdate.start_date = new Date(dataToUpdate.start_date);
     }
@@ -205,11 +212,9 @@ export const updateProjectInDb = async (id: string, projectData: Partial<Project
 
 export const deleteProjectFromDb = async (id: string): Promise<boolean> => {
   try {
-    // First, delete related feedback to avoid foreign key constraint violations
     await prisma.feedback.deleteMany({
       where: { project_id: id },
     });
-    // Then delete the project
     await prisma.project.delete({
       where: { id },
     });
@@ -302,22 +307,18 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
     });
 
     if (existingUser) {
-      // User profile already exists. Update name or avatar if they differ.
       const dataToUpdate: { name?: string | null; avatar_url?: string | null } = {};
       let needsUpdate = false;
 
-      if (userData.name !== existingUser.name) {
+      if (userData.name !== existingUser.name && userData.name !== undefined) {
         dataToUpdate.name = userData.name;
         needsUpdate = true;
       }
-      if (userData.avatar_url !== existingUser.avatar_url) {
+      if (userData.avatar_url !== existingUser.avatar_url && userData.avatar_url !== undefined) {
         dataToUpdate.avatar_url = userData.avatar_url;
         needsUpdate = true;
       }
-      // Do not update email or role here as part of a generic sync/create.
-      // Email is critical and its uniqueness handled by P2002 check in syncUserProfile.
-      // Role is 'user' on creation.
-
+      
       if (needsUpdate) {
         const updatedUser = await prisma.user.update({
           where: { id: userData.id },
@@ -325,24 +326,22 @@ export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_
         });
         return mapPrismaUserToAppUser(updatedUser);
       }
-      // No update needed, return the existing user data mapped to AppUser
       return mapPrismaUserToAppUser(existingUser);
     } else {
-      // User profile does not exist, create it
       const newUser = await prisma.user.create({
         data: {
           id: userData.id,
           name: userData.name,
-          email: userData.email, // Email must be provided for new user
-          role: userData.role || 'user', // Default to 'user' if not provided from syncUserProfile
+          email: userData.email, 
+          role: userData.role || 'user', 
           avatar_url: userData.avatar_url,
         },
       });
       return mapPrismaUserToAppUser(newUser);
     }
   } catch (error) {
-    console.error('Error in createUserProfileInDb:', error); // Log the detailed error
-    throw error; // Re-throw to be caught and handled more specifically by syncUserProfile
+    console.error('Error in createUserProfileInDb:', error); 
+    throw error; 
   }
 }
 
@@ -388,7 +387,7 @@ export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   try {
     const newsArticles = await prisma.newsArticle.findMany({
       orderBy: {
-        published_date: 'desc',
+        publishedDate: 'desc',
       },
     });
     return newsArticles.map(mapPrismaNewsToAppNews);
@@ -398,15 +397,15 @@ export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   }
 };
 
-export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'created_at' | 'updated_at'>;
+export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'createdAt' | 'updatedAt'>;
 
 export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): Promise<AppNewsArticle | null> => {
   try {
     const newArticle = await prisma.newsArticle.create({
       data: {
         ...newsData,
-        image_url: newsData.image_url || null, 
-        data_ai_hint: newsData.data_ai_hint || null, 
+        imageUrl: newsData.imageUrl || null, 
+        dataAiHint: newsData.dataAiHint || null, 
       }
     });
     return mapPrismaNewsToAppNews(newArticle);
@@ -419,16 +418,16 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
 export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsArticleCreationData>): Promise<AppNewsArticle | null> => {
   try {
     const dataToUpdate = { ...newsData };
-    if (dataToUpdate.published_date && typeof dataToUpdate.published_date === 'string') {
-      dataToUpdate.published_date = new Date(dataToUpdate.published_date);
+    if (dataToUpdate.publishedDate && typeof dataToUpdate.publishedDate === 'string') {
+      dataToUpdate.publishedDate = new Date(dataToUpdate.publishedDate);
     }
     
     const updatedArticle = await prisma.newsArticle.update({
       where: { id },
       data: {
         ...dataToUpdate,
-        image_url: dataToUpdate.image_url === '' ? null : dataToUpdate.image_url,
-        data_ai_hint: dataToUpdate.data_ai_hint === '' ? null : dataToUpdate.data_ai_hint,
+        imageUrl: dataToUpdate.imageUrl === '' ? null : dataToUpdate.imageUrl,
+        dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
       },
     });
     return mapPrismaNewsToAppNews(updatedArticle);
@@ -451,47 +450,36 @@ export const deleteNewsArticleFromDb = async (id: string): Promise<boolean> => {
 };
 
 
-// --- Services (Still using mock data, to be migrated to Prisma) ---
-export const mockServices: ServiceItem[] = [
-  {
-    id: 'service1',
-    slug: 'apply-for-passport',
-    title: 'Apply for International Passport',
-    summary: 'Access the portal to apply for or renew your Nigerian international passport.',
-    icon: Plane,
-    category: 'Immigration',
-    link: '#', // Placeholder
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'passport document',
-  },
-  {
-    id: 'service2',
-    slug: 'file-taxes-online',
-    title: 'File Taxes Online (e-FIRS)',
-    summary: 'Use the Federal Inland Revenue Service portal to file your tax returns.',
-    icon: Briefcase, 
-    category: 'Taxation',
-    link: '#', // Placeholder
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'tax document',
-  },
-];
-
-export const getAllServices = (): ServiceItem[] => {
-  console.warn("getAllServices is using mock data.");
-  return mockServices;
+// --- Services Data Functions (Prisma Integrated) ---
+export const getAllServices = async (): Promise<ServiceItem[]> => {
+  try {
+    const prismaServices = await prisma.service.findMany({
+      orderBy: {
+        title: 'asc', // Or createdAt, or any other field
+      },
+    });
+    return prismaServices.map(mapPrismaServiceToAppServiceItem);
+  } catch (error) {
+    console.error('Error fetching all services with Prisma:', error);
+    return [];
+  }
 };
 
-export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
-  console.warn("getServiceBySlug is using mock data.");
-  return mockServices.find(service => service.slug === slug);
+export const getServiceBySlug = async (slug: string): Promise<ServiceItem | undefined> => {
+  try {
+    const prismaService = await prisma.service.findUnique({
+      where: { slug },
+    });
+    return prismaService ? mapPrismaServiceToAppServiceItem(prismaService) : undefined;
+  } catch (error) {
+    console.error(`Error fetching service by slug "${slug}" with Prisma:`, error);
+    return undefined;
+  }
 };
 
 // --- Mock Data (to be phased out as features are migrated) ---
-export const MOCK_PROJECTS_TEMP: AppProject[] = []; 
 export const mockFeaturedVideos: Video[] = [
   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
 ];
-

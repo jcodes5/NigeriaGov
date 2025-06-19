@@ -151,7 +151,7 @@ export interface Database {
           }
         ]
       }
-      news_articles: { // Added NewsArticle table definition
+      news_articles: { 
         Row: {
           id: string
           slug: string
@@ -188,6 +188,48 @@ export interface Database {
           category?: string
           published_date?: string
           content?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      services: { // Added Service table definition
+        Row: {
+          id: string
+          slug: string
+          title: string
+          summary: string
+          icon_name: string | null
+          link: string | null
+          category: string
+          image_url: string | null
+          data_ai_hint: string | null
+          created_at: string // timestamptz
+          updated_at: string // timestamptz
+        }
+        Insert: {
+          id?: string
+          slug: string
+          title: string
+          summary: string
+          icon_name?: string | null
+          link?: string | null
+          category: string
+          image_url?: string | null
+          data_ai_hint?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          title?: string
+          summary?: string
+          icon_name?: string | null
+          link?: string | null
+          category?: string
+          image_url?: string | null
+          data_ai_hint?: string | null
           created_at?: string
           updated_at?: string
         }

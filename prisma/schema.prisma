@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // For Prisma Migrate, if different
 }
 
 generator client {
@@ -8,56 +9,59 @@ generator client {
 }
 
 model User {
-  id         String     @id @unique // Matches Supabase auth.users.id
-  name       String?
-  email      String?    @unique
-  role       String? // 'user' or 'admin'
-  avatar_url String?
-  created_at DateTime?  @default(now())
-  updated_at DateTime?  @updatedAt
-  feedback   Feedback[] // Relation to Feedback model
+  id          String    @id // Matches Supabase Auth user ID (UUID)
+  email       String?   @unique
+  name        String?
+  role        String?   // e.g., 'user', 'admin'
+  avatar_url  String?
+  created_at  DateTime? @default(now())
+  updated_at  DateTime? @updatedAt
 
-  @@map("users") // Explicitly map to the 'users' table
+  feedback    Feedback[] @relation("UserFeedback")
+
+  @@map("users") // Explicitly map to the 'users' table in public schema
 }
 
-model Project {
-  id                  String     @id @default(uuid())
-  title               String
-  subtitle            String
-  ministry_id         String?
-  state_id            String?
-  status              String // 'Ongoing', 'Completed', 'Planned', 'On Hold'
-  start_date          DateTime
-  expected_end_date   DateTime?
-  actual_end_date     DateTime?
-  description         String     @db.Text
-  images              Json? // Array of { url: string; alt: string; dataAiHint?: string }
-  videos              Json? // Array of Video type
-  impact_stats        Json? // Array of ImpactStat type (with iconName)
-  budget              Decimal?
-  expenditure         Decimal?
-  tags                String[] // Array of text
-  last_updated_at     DateTime   @default(now())
-  created_at          DateTime   @default(now())
-  feedback_list       Feedback[] @relation("ProjectFeedback") // Explicit relation name
 
-  @@map("projects") // Explicitly map to the 'projects' table
+model Project {
+  id                String    @id @default(uuid())
+  title             String    @unique // Added unique constraint
+  subtitle          String
+  ministry_id       String?   // Using String for now, will map to mock data
+  state_id          String?   // Using String for now, will map to mock data
+  status            String    // e.g., 'Ongoing', 'Completed', 'Planned'
+  start_date        DateTime  @map("start_date")
+  expected_end_date DateTime? @map("expected_end_date")
+  actual_end_date   DateTime? @map("actual_end_date")
+  description       String    @db.Text
+  images            Json?     // Store as JSON array of { url: string; alt: string; dataAiHint?: string }
+  videos            Json?     // Store as JSON array of Video type
+  impact_stats      Json?     // Store as JSON array of ImpactStat type
+  budget            Float?    // Using Float for currency
+  expenditure       Float?
+  tags              String[]  @default([])
+  last_updated_at   DateTime  @updatedAt @map("last_updated_at")
+  created_at        DateTime  @default(now()) @map("created_at")
+
+  feedback_list     Feedback[] @relation("ProjectFeedback")
+
+  @@map("projects")
 }
 
 model Feedback {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   project_id        String
   user_id           String?
   user_name         String
-  comment           String   @db.Text
+  comment           String    @db.Text
   rating            Int?
   sentiment_summary String?
-  created_at        DateTime @default(now())
+  created_at        DateTime  @default(now()) @map("created_at")
 
-  project Project @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
-  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  project           Project   @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
+  user              User?     @relation("UserFeedback", fields: [user_id], references: [id], onDelete: SetNull) // SetNull if user deleted
 
-  @@map("feedback") // Explicitly map to the 'feedback' table
+  @@map("feedback")
 }
 
 model NewsArticle {
@@ -74,4 +78,20 @@ model NewsArticle {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("news_articles")
+}
+
+model Service {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  title        String
+  summary      String   @db.Text
+  iconName     String?  @map("icon_name")
+  link         String?
+  category     String
+  imageUrl     String?  @map("image_url")
+  dataAiHint   String?  @map("data_ai_hint")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("services")
 }

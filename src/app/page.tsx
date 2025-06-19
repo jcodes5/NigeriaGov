@@ -4,14 +4,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowRight, CheckCircle, Eye, Newspaper, Server, PlayCircle, Briefcase } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getAllNewsArticles, mockServices, getAllProjects, mockFeaturedVideos } from "@/lib/data";
+import { getAllNewsArticles, getAllServices, getAllProjects, mockFeaturedVideos } from "@/lib/data";
 import { NewsCard } from "@/components/news/news-card";
 import { ServiceCard } from "@/components/services/service-card";
 import { VideoCard } from "@/components/common/video-card";
-import type { Project, NewsArticle } from "@/types";
+import type { Project, NewsArticle, ServiceItem } from "@/types";
 
-
-const popularServices = mockServices.slice(0, 3); // Services still mock for now
 
 export default async function Home() {
   const allProjects: Project[] = await getAllProjects();
@@ -19,6 +17,9 @@ export default async function Home() {
 
   const allNews: NewsArticle[] = await getAllNewsArticles();
   const latestNews = allNews.slice(0, 3);
+
+  const allServices: ServiceItem[] = await getAllServices();
+  const popularServices = allServices.slice(0, 3);
 
   return (
     <div className="space-y-16">

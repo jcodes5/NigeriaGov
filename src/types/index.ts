@@ -1,6 +1,6 @@
 
-// Removed: import type { Database } from "./supabase"; // No longer primary source for DB types with Prisma
-import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle } from '@prisma/client';
+import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService } from '@prisma/client';
+import type * as LucideIcons from 'lucide-react';
 
 
 export interface Ministry {
@@ -13,25 +13,24 @@ export interface State {
   name: string;
 }
 
-// AppFeedback type, aligned with what Prisma will provide or what UI expects
 export interface Feedback {
   id: string;
   project_id: string;
-  user_id: string | null; // Can be null if feedback is anonymous or user not in DB
+  user_id: string | null; 
   user_name: string;
   comment: string;
   rating: number | null;
   sentiment_summary: string | null;
-  created_at: string; // ISO date string
-  user?: User; // Optional: if user data is joined/included
+  created_at: string; 
+  user?: User; 
 }
 
 
 export interface ImpactStat {
   label: string;
   value: string;
-  iconName?: string; // Store Lucide icon name
-  icon?: React.ElementType; // Resolved on client
+  iconName?: keyof typeof LucideIcons; 
+  icon?: React.ElementType; 
 }
 
 export interface Video {
@@ -43,7 +42,6 @@ export interface Video {
   dataAiHint?: string;
 }
 
-// Represents the data structure for the application, potentially mapped from Prisma
 export interface Project {
   id: string;
   title: string;
@@ -74,19 +72,18 @@ export interface User {
   email: string | null;
   role: 'user' | 'admin' | null;
   avatarUrl?: string | null;
-  created_at?: string | null; // ISO date string or null
+  created_at?: string | null; 
 }
 
-// Updated to align with Prisma's Date object for publishedDate
 export interface NewsArticle {
   id: string;
   slug: string;
   title: string;
   summary: string;
-  imageUrl?: string | null; // Prisma might return null
-  dataAiHint?: string | null; // Prisma might return null
+  imageUrl?: string | null; 
+  dataAiHint?: string | null; 
   category: string;
-  publishedDate: Date; // Prisma returns Date objects
+  publishedDate: Date; 
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -98,15 +95,16 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  iconName?: string;
-  icon?: React.ElementType;
-  link?: string;
+  iconName?: keyof typeof LucideIcons;
+  icon?: React.ElementType; // Resolved on client
+  link?: string | null;
   category: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageUrl?: string | null;
+  dataAiHint?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Zod schema for Project Form (can be defined here or in the form component)
 export const projectFormSchemaRaw = {
   title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(150),
   subtitle: (z: any) => z.string().min(10, "Subtitle must be at least 10 characters.").max(250),
@@ -124,7 +122,7 @@ export const projectFormSchemaRaw = {
     (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
     z.number().positive("Expenditure must be a positive number.").optional().nullable()
   ),
-  tags: (z: any) => z.string().optional(), // Comma-separated
+  tags: (z: any) => z.string().optional(), 
 };
 
 export type ProjectFormData = {
@@ -138,7 +136,7 @@ export type ProjectFormData = {
   description: string;
   budget?: number | null;
   expenditure?: number | null;
-  tags?: string; // Comma-separated string for the form
+  tags?: string; 
 };
 
 
@@ -154,7 +152,6 @@ export const newsArticleFormSchemaRaw = {
   dataAiHint: (z: any) => z.string().max(50, "AI hint too long.").optional().nullable(),
 };
 
-// For the form data, we might not include ID directly in Zod schema if it's passed separately
 export type NewsArticleFormData = {
   title: string;
   slug: string;
@@ -165,4 +162,3 @@ export type NewsArticleFormData = {
   imageUrl?: string | null;
   dataAiHint?: string | null;
 };
-
