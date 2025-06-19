@@ -2,12 +2,52 @@
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import prisma from '@/lib/prisma';
-import type { NextAuthConfig } from 'next-auth';
+import type { NextAuthConfig, User as NextAuthUser } from 'next-auth'; // Import User type from next-auth
+import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 
-// Define providers here as you add them, e.g., Google, Email, Credentials
-// For now, an empty array or a placeholder provider.
-// We will add Google, Facebook, and Email/Credentials providers in subsequent steps.
-const providers = [];
+// Define providers here as you add them
+const providers = [
+  CredentialsProvider({
+    name: 'Credentials',
+    credentials: {
+      email: { label: "Email", type: "email" },
+      password: { label: "Password", type: "password" }
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials.password) {
+        throw new Error('Email and password are required.');
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { email: credentials.email as string },
+      });
+
+      if (!user || !user.password) {
+        // User not found or password not set (e.g., OAuth user)
+        throw new Error('Invalid email or password.');
+      }
+
+      const isValidPassword = await bcrypt.compare(credentials.password as string, user.password);
+
+      if (!isValidPassword) {
+        throw new Error('Invalid email or password.');
+      }
+      
+      // Return user object that NextAuth expects
+      // Ensure this matches the shape expected by your session/jwt callbacks
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        role: user.role, // Custom property
+      };
+    }
+  }),
+  // GoogleProvider will be added here
+  // FacebookProvider will be added here
+];
 
 export const authOptions: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
@@ -21,29 +61,23 @@ export const authOptions: NextAuthConfig = {
     // verifyRequest: '/auth/verify-request', // For Email provider (magic links)
   },
   callbacks: {
-    async session({ session, token }) {
-      // Add user ID and role to the session object
-      if (token.sub && session.user) {
-        session.user.id = token.sub;
-      }
-      if (token.role && session.user) {
-        // Assuming role is stored in the token, which we'll set up in jwt callback
-        (session.user as any).role = token.role;
-      }
-      return session;
-    },
     async jwt({ token, user }) {
       // Persist user ID and role to the JWT
-      if (user) {
-        token.sub = user.id;
-        // If your User model in DB has a 'role' field, cast 'user' to include it
-        // This assumes your Prisma adapter returns the user object with 'role'
-        const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-        if (dbUser && dbUser.role) {
-           token.role = dbUser.role;
-        }
+      if (user) { // user object is available during sign-in
+        token.id = user.id;
+        token.role = (user as any).role; // Cast if 'role' is not in NextAuthUser type
       }
       return token;
+    },
+    async session({ session, token }) {
+      // Add user ID and role to the session object from the JWT
+      if (token.id && session.user) {
+        session.user.id = token.id as string;
+      }
+      if (token.role && session.user) {
+        (session.user as any).role = token.role; // Cast if 'role' is not in Session['user'] type
+      }
+      return session;
     },
   },
   // Events can be used for things like creating a user profile in your own tables

@@ -6,7 +6,6 @@ import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from
 import { 
   addFeedbackToProject as saveFeedbackToDb, 
   deleteUserById as removeUserFromDb,
-  // createUserProfileInDb, // This is now handled by NextAuth Prisma Adapter
   getUserProfileFromDb,
   createProjectInDb as saveProjectToDb, 
   updateProjectInDb,
@@ -31,7 +30,7 @@ import {
 import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData, SiteSettings } from '@/types';
 import type { SiteSettingsFormData } from '@/app/dashboard/admin/site-settings/page';
 import prisma from './prisma';
-
+import bcrypt from 'bcryptjs'; // For password hashing
 
 export interface SubmitFeedbackResult {
   success: boolean;
@@ -111,14 +110,9 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   }
 }
 
-// syncUserProfile is no longer needed as NextAuth.js Prisma adapter handles user creation.
-// export async function syncUserProfile(
-//   data: { userId: string; email: string; name: string; avatarUrl?: string | null }
-// ): Promise<{ user: AppUser | null; error: string | null }> { ... }
 
 export async function getUserProfile(userId: string): Promise<AppUser | null> {
   try {
-    // This now fetches the user based on the NextAuth.js compatible User model
     const profile = await getUserProfileFromDb(userId);
     return profile;
   } catch (error) {
@@ -577,5 +571,70 @@ export async function updateSiteSettingsAction(
       message: 'An unexpected error occurred while saving site settings.', 
       errorDetails: error instanceof Error ? error.stack : undefined 
     };
+  }
+}
+
+// --- User Creation Action for Credentials Signup ---
+interface CreateUserResult {
+  success: boolean;
+  message: string;
+  user?: AppUser | null; // Return the created user on success
+}
+
+export async function createUserAction(data: { name: string; email: string; password?: string }): Promise<CreateUserResult> {
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      return { success: false, message: "An account with this email already exists." };
+    }
+
+    let hashedPassword = null;
+    if (data.password) {
+      hashedPassword = await bcrypt.hash(data.password, 10);
+    } else {
+      // This case should ideally not be hit if using credentials provider which requires password
+      // but as a fallback if we allow creation without password for OAuth later.
+      // For pure credentials, password should always be present.
+      return { success: false, message: "Password is required for credentials signup." };
+    }
+
+    const newUser = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: hashedPassword, 
+        // role: 'user', // Default role, handled by Prisma schema default or can be set here
+        // emailVerified: null, // NextAuth typically handles this with VerificationToken for email provider
+      },
+    });
+
+    // Map Prisma user to AppUser for consistent return type
+    const appUser: AppUser = {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        emailVerified: newUser.emailVerified,
+        image: newUser.image,
+        role: newUser.role as AppUser['role'] | null,
+        created_at: newUser.created_at ? newUser.created_at.toISOString() : null,
+    };
+
+
+    return { success: true, message: "User created successfully.", user: appUser };
+  } catch (error) {
+    console.error("Error creating user:", error);
+    let errorMessage = "An unexpected error occurred during user creation.";
+    if (error instanceof Error) {
+        // Check for Prisma specific errors, e.g., unique constraint violation if not caught by email check
+        if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('email')) {
+             errorMessage = 'An account with this email already exists.';
+        } else {
+            errorMessage = error.message;
+        }
+    }
+    return { success: false, message: errorMessage };
   }
 }
