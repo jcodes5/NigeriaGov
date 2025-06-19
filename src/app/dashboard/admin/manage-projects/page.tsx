@@ -6,15 +6,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, PlusCircle, Construction } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useEffect, useState } from "react";
+import { MoreHorizontal, PlusCircle, Construction, Edit, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import React, { useEffect, useState, useTransition } from "react";
 import type { Project } from "@/types"; 
 import { getAllProjects } from "@/lib/data"; 
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { deleteProject } from "@/lib/actions";
 
 export default function ManageProjectsPage() {
   const { profile, isAdmin, isLoading: authLoading } = useAuth();
@@ -22,31 +33,50 @@ export default function ManageProjectsPage() {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+
+
+  const fetchAdminProjects = React.useCallback(async () => {
+    if (!authLoading) {
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+        return;
+      }
+      
+      setIsLoadingData(true);
+      try {
+        const fetchedProjects = await getAllProjects(); 
+        setProjects(fetchedProjects);
+      } catch (error) {
+        console.error("Failed to fetch projects for admin:", error);
+        toast({ title: "Error", description: "Failed to load projects.", variant: "destructive" });
+        setProjects([]);
+      } finally {
+        setIsLoadingData(false);
+      }
+    }
+  }, [isAdmin, authLoading, router, toast]);
 
   useEffect(() => {
-    const fetchAdminProjects = async () => {
-      if (!authLoading) {
-        if (!isAdmin) {
-          toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-          router.replace("/dashboard/user");
-          return;
-        }
-        
-        setIsLoadingData(true);
-        try {
-          const fetchedProjects = await getAllProjects(); // Fetches from DB
-          setProjects(fetchedProjects);
-        } catch (error) {
-          console.error("Failed to fetch projects for admin:", error);
-          toast({ title: "Error", description: "Failed to load projects.", variant: "destructive" });
-          setProjects([]);
-        } finally {
-          setIsLoadingData(false);
-        }
-      }
-    };
     fetchAdminProjects();
-  }, [profile, isAdmin, authLoading, router, toast]);
+  }, [fetchAdminProjects]);
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    startDeleteTransition(async () => {
+      const result = await deleteProject(projectToDelete.id);
+      if (result.success) {
+        toast({ title: "Project Deleted", description: result.message });
+        setProjects((prevProjects) => prevProjects.filter((p) => p.id !== projectToDelete.id));
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+      setProjectToDelete(null);
+    });
+  };
 
   const overallLoading = authLoading || (isLoadingData && isAdmin);
 
@@ -59,7 +89,7 @@ export default function ManageProjectsPage() {
               <Skeleton className="h-8 w-1/2" />
               <Skeleton className="h-4 w-3/4 mt-1" />
             </div>
-            <Skeleton className="h-10 w-40" /> {/* Adjusted width for new button */}
+            <Skeleton className="h-10 w-40" /> 
           </CardHeader>
         </Card>
         <Card>
@@ -150,16 +180,28 @@ export default function ManageProjectsPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" disabled={isDeleting}>
                             <MoreHorizontal className="h-4 w-4" />
                              <span className="sr-only">Project Actions</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit Project (Coming Soon)</DropdownMenuItem>
-                          <DropdownMenuItem>View Details (Coming Soon)</DropdownMenuItem>
-                          <DropdownMenuItem>Manage Feedback (Coming Soon)</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">Delete Project (Coming Soon)</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/admin/manage-projects/edit/${project.id}`}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit Project
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                             <Link href={`/projects/${project.id}`} target="_blank">View Project</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => setProjectToDelete(project)} 
+                            className="text-destructive"
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Project
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -170,7 +212,31 @@ export default function ManageProjectsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {projectToDelete && (
+        <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the project titled &quot;{projectToDelete.title}&quot; and all its associated feedback.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setProjectToDelete(null)} disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete Project"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
-

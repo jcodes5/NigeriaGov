@@ -13,14 +13,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addProject } from "@/lib/actions";
-import { ministries, states } from "@/lib/data"; // Using mock ministries/states for now
+import { addProject, updateProject } from "@/lib/actions";
+import { ministries, states } from "@/lib/data"; 
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { projectFormSchemaRaw } from "@/types"; // Import the raw schema parts
+import { projectFormSchemaRaw, type Project, type ProjectFormData } from "@/types"; 
+import { useEffect } from "react";
 
-// Construct the Zod schema using the imported raw parts
 const projectSchema = z.object({
   title: projectFormSchemaRaw.title(z),
   subtitle: projectFormSchemaRaw.subtitle(z),
@@ -28,59 +28,93 @@ const projectSchema = z.object({
   stateId: projectFormSchemaRaw.stateId(z),
   status: projectFormSchemaRaw.status(z),
   startDate: projectFormSchemaRaw.startDate(z),
-  expectedEndDate: projectFormSchemaRaw.expectedEndDate(z),
+  expectedEndDate: projectFormSchemaRaw.expectedEndDate(z).nullable(), // Ensure nullable matches Prisma
   description: projectFormSchemaRaw.description(z),
-  budget: projectFormSchemaRaw.budget(z),
-  expenditure: projectFormSchemaRaw.expenditure(z),
+  budget: projectFormSchemaRaw.budget(z).nullable(),
+  expenditure: projectFormSchemaRaw.expenditure(z).nullable(),
   tags: projectFormSchemaRaw.tags(z),
 });
 
 
-type ProjectFormData = z.infer<typeof projectSchema>;
-
 interface ProjectFormProps {
-  project?: ProjectFormData; // For editing, not used in this "add" iteration
+  initialData?: Project; 
+  projectId?: string; 
   onSuccess?: () => void;
 }
 
-export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
+export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const isEditMode = !!projectId;
+
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
-    defaultValues: project || {
+    defaultValues: initialData ? {
+      ...initialData,
+      ministryId: initialData.ministry_id || "", // Map from AppProject to ProjectFormData
+      stateId: initialData.state_id || "",     // Map from AppProject to ProjectFormData
+      startDate: initialData.startDate ? new Date(initialData.startDate) : new Date(),
+      expectedEndDate: initialData.expectedEndDate ? new Date(initialData.expectedEndDate) : null,
+      tags: initialData.tags?.join(', ') || "",
+      budget: initialData.budget || undefined,
+      expenditure: initialData.expenditure || undefined,
+    } : {
       title: "",
       subtitle: "",
       ministryId: "",
       stateId: "",
       status: "Planned",
-      startDate: undefined, // Let date picker handle initial undefined state
-      expectedEndDate: undefined,
+      startDate: new Date(), 
+      expectedEndDate: null,
       description: "",
       budget: undefined,
       expenditure: undefined,
       tags: "",
     },
   });
+  
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        ...initialData,
+        ministryId: initialData.ministry_id || "",
+        stateId: initialData.state_id || "",
+        startDate: initialData.startDate ? new Date(initialData.startDate) : new Date(),
+        expectedEndDate: initialData.expectedEndDate ? new Date(initialData.expectedEndDate) : null,
+        tags: initialData.tags?.join(', ') || "",
+        budget: initialData.budget || undefined,
+        expenditure: initialData.expenditure || undefined,
+      });
+    }
+  }, [initialData, reset]);
+
 
   const onSubmit: SubmitHandler<ProjectFormData> = async (data) => {
-    const result = await addProject({
+     const dataToSubmit = {
       ...data,
-      // Convert tags string to array if necessary, or handle in server action
-      tags: data.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
-    });
+      // tags will be converted from string to array in the server action
+    };
+
+    let result;
+    if (isEditMode && projectId) {
+      result = await updateProject(projectId, dataToSubmit);
+    } else {
+      result = await addProject(dataToSubmit);
+    }
+
 
     if (result.success) {
       toast({
-        title: "Project Added!",
+        title: isEditMode ? "Project Updated!" : "Project Added!",
         description: result.message,
       });
-      reset(); // Reset form
+      if (!isEditMode) reset(); 
       if (onSuccess) onSuccess();
-      router.push("/dashboard/admin/manage-projects"); // Navigate back to list
+      router.push("/dashboard/admin/manage-projects"); 
+      router.refresh();
     } else {
       toast({
-        title: "Error Adding Project",
+        title: isEditMode ? "Error Updating Project" : "Error Adding Project",
         description: result.message || "An unknown error occurred.",
         variant: "destructive",
       });
@@ -237,8 +271,9 @@ export function ProjectForm({ project, onSuccess }: ProjectFormProps) {
       </div>
 
       <Button type="submit" className="w-full sm:w-auto button-hover" disabled={isSubmitting}>
-        {isSubmitting ? "Adding Project..." : "Add Project"}
+        {isSubmitting ? (isEditMode ? "Updating..." : "Adding...") : (isEditMode ? "Update Project" : "Add Project")}
       </Button>
     </form>
   );
 }
+

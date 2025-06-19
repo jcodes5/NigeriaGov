@@ -9,13 +9,15 @@ import {
   createUserProfileInDb,
   getUserProfileFromDb,
   createProjectInDb as saveProjectToDb, 
+  updateProjectInDb,
+  deleteProjectFromDb,
   type ProjectCreationData,
   createNewsArticleInDb as saveNewsArticleToDb, 
   type NewsArticleCreationData,
   updateNewsArticleInDb,
   deleteNewsArticleFromDb,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, NewsArticleFormData } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, NewsArticleFormData, ProjectFormData } from '@/types';
 import prisma from './prisma';
 
 
@@ -145,21 +147,21 @@ interface ActionResult<T = null> {
 }
 
 export async function addProject(
-  projectData: Omit<ProjectCreationData, 'ministry_id' | 'state_id'> & { ministryId: string; stateId: string;}
+  formData: ProjectFormData
 ): Promise<ActionResult<AppProject>> {
   try {
     const dataToSave: ProjectCreationData = {
-      title: projectData.title,
-      subtitle: projectData.subtitle,
-      ministry_id: projectData.ministryId,
-      state_id: projectData.stateId,
-      status: projectData.status,
-      start_date: projectData.startDate,
-      expected_end_date: projectData.expectedEndDate,
-      description: projectData.description,
-      budget: projectData.budget,
-      expenditure: projectData.expenditure,
-      tags: projectData.tags,
+      title: formData.title,
+      subtitle: formData.subtitle,
+      ministry_id: formData.ministryId,
+      state_id: formData.stateId,
+      status: formData.status,
+      start_date: formData.startDate,
+      expected_end_date: formData.expectedEndDate,
+      description: formData.description,
+      budget: formData.budget,
+      expenditure: formData.expenditure,
+      tags: formData.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
     };
 
     const newProject = await saveProjectToDb(dataToSave);
@@ -169,14 +171,14 @@ export async function addProject(
 
     revalidatePath('/projects');
     revalidatePath('/dashboard/admin/manage-projects');
-    revalidatePath('/'); // For featured projects on homepage
+    revalidatePath('/'); 
     return { success: true, message: 'Project added successfully!', item: newProject };
   } catch (error) {
     console.error('Error adding project:', error);
     let errorMessage = 'An unexpected error occurred while adding the project.';
     if (error instanceof Error) {
       errorMessage = error.message;
-      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('title')) { // Example for unique constraint, adjust if needed
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('title')) { 
           errorMessage = 'A project with this title already exists.';
       }
     }
@@ -184,11 +186,69 @@ export async function addProject(
   }
 }
 
+export async function updateProject(
+  id: string,
+  formData: ProjectFormData
+): Promise<ActionResult<AppProject>> {
+  try {
+    const dataToUpdate: Partial<ProjectCreationData> = {
+      title: formData.title,
+      subtitle: formData.subtitle,
+      ministry_id: formData.ministryId,
+      state_id: formData.stateId,
+      status: formData.status,
+      start_date: formData.startDate,
+      expected_end_date: formData.expectedEndDate,
+      description: formData.description,
+      budget: formData.budget,
+      expenditure: formData.expenditure,
+      tags: formData.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
+    };
+
+    const updatedProject = await updateProjectInDb(id, dataToUpdate);
+    if (!updatedProject) {
+      return { success: false, message: 'Failed to update project in the database.' };
+    }
+
+    revalidatePath('/projects');
+    revalidatePath(`/projects/${id}`);
+    revalidatePath('/dashboard/admin/manage-projects');
+    revalidatePath('/');
+    return { success: true, message: 'Project updated successfully!', item: updatedProject };
+  } catch (error) {
+    console.error('Error updating project:', error);
+    let errorMessage = 'An unexpected error occurred while updating the project.';
+     if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('title')) {
+          errorMessage = 'A project with this title already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function deleteProject(id: string): Promise<ActionResult> {
+  try {
+    const success = await deleteProjectFromDb(id);
+    if (!success) {
+      return { success: false, message: 'Failed to delete project from the database.' };
+    }
+    revalidatePath('/projects');
+    revalidatePath('/dashboard/admin/manage-projects');
+    revalidatePath('/');
+    return { success: true, message: 'Project deleted successfully!' };
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    return { success: false, message: 'An unexpected error occurred while deleting the project.', errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+
 export async function addNewsArticle(
   newsData: NewsArticleFormData
 ): Promise<ActionResult<AppNewsArticle>> {
   try {
-    // Basic slug check (Prisma will enforce uniqueness at DB level if schema is correct)
     const existingArticleBySlug = await prisma.newsArticle.findUnique({ where: { slug: newsData.slug }});
     if (existingArticleBySlug) {
       return { success: false, message: `A news article with the slug "${newsData.slug}" already exists.`};
@@ -196,7 +256,7 @@ export async function addNewsArticle(
 
     const dataToSave: NewsArticleCreationData = {
       ...newsData,
-      published_date: newsData.publishedDate, // Ensure field name matches Prisma schema
+      published_date: newsData.publishedDate, 
       image_url: newsData.imageUrl,
       data_ai_hint: newsData.dataAiHint,
     };
@@ -209,7 +269,7 @@ export async function addNewsArticle(
     revalidatePath('/news');
     revalidatePath(`/news/${newArticle.slug}`);
     revalidatePath('/dashboard/admin/manage-news');
-    revalidatePath('/'); // For latest news on homepage
+    revalidatePath('/'); 
     return { success: true, message: 'News article added successfully!', item: newArticle };
   } catch (error) {
     console.error('Error adding news article:', error);
@@ -229,12 +289,11 @@ export async function updateNewsArticle(
   newsData: NewsArticleFormData
 ): Promise<ActionResult<AppNewsArticle>> {
   try {
-    // If slug is being updated, check for uniqueness excluding the current article
     if (newsData.slug) {
       const existingArticleBySlug = await prisma.newsArticle.findFirst({ 
         where: { 
           slug: newsData.slug,
-          id: { not: id } // Exclude the current article from the check
+          id: { not: id } 
         }
       });
       if (existingArticleBySlug) {
@@ -256,7 +315,7 @@ export async function updateNewsArticle(
     }
 
     revalidatePath('/news');
-    revalidatePath(`/news/${updatedArticle.slug}`); // Revalidate old and new slug if slug changes (not handled here yet)
+    revalidatePath(`/news/${updatedArticle.slug}`); 
     revalidatePath('/dashboard/admin/manage-news');
     revalidatePath('/'); 
     return { success: true, message: 'News article updated successfully!', item: updatedArticle };
@@ -290,3 +349,4 @@ export async function deleteNewsArticle(id: string): Promise<ActionResult> {
     return { success: false, message: 'An unexpected error occurred while deleting the news article.', errorDetails: error instanceof Error ? error.stack : undefined };
   }
 }
+

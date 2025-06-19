@@ -1,5 +1,5 @@
 
-import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem } from '@/types';
+import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem, ProjectFormData } from '@/types';
 import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle, PersonStanding, Construction, CheckCircle, Zap } from 'lucide-react';
 import prisma from './prisma';
 import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle } from '@prisma/client';
@@ -108,10 +108,10 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
     slug: prismaNews.slug,
     title: prismaNews.title,
     summary: prismaNews.summary,
-    imageUrl: prismaNews.image_url, // Corrected mapping
-    dataAiHint: prismaNews.data_ai_hint, // Corrected mapping
+    imageUrl: prismaNews.image_url, 
+    dataAiHint: prismaNews.data_ai_hint, 
     category: prismaNews.category,
-    publishedDate: new Date(prismaNews.published_date), // Corrected mapping
+    publishedDate: new Date(prismaNews.published_date), 
     content: prismaNews.content,
     createdAt: new Date(prismaNews.created_at),
     updatedAt: new Date(prismaNews.updated_at),
@@ -173,6 +173,50 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
   } catch (error) {
     console.error('Error creating project in DB with Prisma:', error);
     return null;
+  }
+};
+
+export const updateProjectInDb = async (id: string, projectData: Partial<ProjectCreationData>): Promise<AppProject | null> => {
+  try {
+    const dataToUpdate = { ...projectData };
+    // Ensure dates are Date objects if provided
+    if (dataToUpdate.start_date && typeof dataToUpdate.start_date === 'string') {
+      dataToUpdate.start_date = new Date(dataToUpdate.start_date);
+    }
+    if (dataToUpdate.expected_end_date && typeof dataToUpdate.expected_end_date === 'string') {
+      dataToUpdate.expected_end_date = new Date(dataToUpdate.expected_end_date);
+    }
+    
+    const updatedProject = await prisma.project.update({
+      where: { id },
+      data: {
+        ...dataToUpdate,
+        budget: dataToUpdate.budget ?? undefined,
+        expenditure: dataToUpdate.expenditure ?? undefined,
+        // images, videos, impact_stats are not updated via this simple form for now
+      },
+    });
+    return mapPrismaProjectToAppProject(updatedProject);
+  } catch (error) {
+    console.error(`Error updating project with ID "${id}" in DB with Prisma:`, error);
+    return null;
+  }
+};
+
+export const deleteProjectFromDb = async (id: string): Promise<boolean> => {
+  try {
+    // First, delete related feedback to avoid foreign key constraint violations
+    await prisma.feedback.deleteMany({
+      where: { project_id: id },
+    });
+    // Then delete the project
+    await prisma.project.delete({
+      where: { id },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting project with ID "${id}" from DB with Prisma:`, error);
+    return false;
   }
 };
 
@@ -342,8 +386,8 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
     const newArticle = await prisma.newsArticle.create({
       data: {
         ...newsData,
-        image_url: newsData.image_url || null, // Ensure null if empty string
-        data_ai_hint: newsData.data_ai_hint || null, // Ensure null if empty string
+        image_url: newsData.image_url || null, 
+        data_ai_hint: newsData.data_ai_hint || null, 
       }
     });
     return mapPrismaNewsToAppNews(newArticle);
@@ -355,7 +399,6 @@ export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): 
 
 export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsArticleCreationData>): Promise<AppNewsArticle | null> => {
   try {
-    // Ensure publishedDate is a Date object if provided
     const dataToUpdate = { ...newsData };
     if (dataToUpdate.published_date && typeof dataToUpdate.published_date === 'string') {
       dataToUpdate.published_date = new Date(dataToUpdate.published_date);
@@ -426,9 +469,10 @@ export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
 };
 
 // --- Mock Data (to be phased out as features are migrated) ---
-export const MOCK_PROJECTS_TEMP: AppProject[] = []; // No longer primary source for projects
+export const MOCK_PROJECTS_TEMP: AppProject[] = []; 
 export const mockFeaturedVideos: Video[] = [
   { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
   { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
   { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
 ];
+

@@ -1,6 +1,6 @@
 
 // Removed: import type { Database } from "./supabase"; // No longer primary source for DB types with Prisma
-import type { NewsArticle as PrismaNewsArticle } from '@prisma/client';
+import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle } from '@prisma/client';
 
 
 export interface Ministry {
@@ -127,6 +127,20 @@ export const projectFormSchemaRaw = {
   tags: (z: any) => z.string().optional(), // Comma-separated
 };
 
+export type ProjectFormData = {
+  title: string;
+  subtitle: string;
+  ministryId: string;
+  stateId: string;
+  status: 'Planned' | 'Ongoing' | 'Completed' | 'On Hold';
+  startDate: Date;
+  expectedEndDate?: Date | null;
+  description: string;
+  budget?: number | null;
+  expenditure?: number | null;
+  tags?: string; // Comma-separated string for the form
+};
+
 
 export const newsArticleFormSchemaRaw = {
   title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(200),
@@ -151,3 +165,4 @@ export type NewsArticleFormData = {
   imageUrl?: string | null;
   dataAiHint?: string | null;
 };
+
