@@ -4,14 +4,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowRight, CheckCircle, Eye, Newspaper, Server, PlayCircle, Briefcase } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getAllNewsArticles, mockServices, getAllProjects, mockFeaturedVideos } from "@/lib/data";
+import { getAllNewsArticles, getAllServices, getAllProjects, getAllVideosFromDb } from "@/lib/data";
 import { NewsCard } from "@/components/news/news-card";
 import { ServiceCard } from "@/components/services/service-card";
 import { VideoCard } from "@/components/common/video-card";
-import type { Project, NewsArticle } from "@/types";
+import type { Project, NewsArticle, ServiceItem, Video } from "@/types";
 
-
-const popularServices = mockServices.slice(0, 3); // Services still mock for now
 
 export default async function Home() {
   const allProjects: Project[] = await getAllProjects();
@@ -19,6 +17,12 @@ export default async function Home() {
 
   const allNews: NewsArticle[] = await getAllNewsArticles();
   const latestNews = allNews.slice(0, 3);
+
+  const allServices: ServiceItem[] = await getAllServices();
+  const popularServices = allServices.slice(0, 3);
+
+  const allVideos: Video[] = await getAllVideosFromDb(); // Fetch videos from DB
+  const featuredVideos = allVideos.slice(0, 3); // Take first 3 as featured
 
   return (
     <div className="space-y-16">
@@ -138,7 +142,7 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Featured Services Section */}
+      {/* Popular Services Section */}
       {popularServices.length > 0 && (
         <section className="py-16 bg-muted/30 rounded-lg">
           <div className="container mx-auto px-4">
@@ -160,17 +164,25 @@ export default async function Home() {
       )}
 
       {/* Featured Videos Section */}
-      {mockFeaturedVideos.length > 0 && (
+      {featuredVideos.length > 0 && (
         <section className="py-16">
           <div className="container mx-auto px-4">
             <h2 className="font-headline text-3xl font-bold text-center mb-12 text-foreground flex items-center justify-center">
               <PlayCircle className="h-8 w-8 mr-3 text-primary" /> Featured Videos
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockFeaturedVideos.map((video) => (
+              {featuredVideos.map((video) => (
                 <VideoCard key={video.id} video={video} embed={true} />
               ))}
             </div>
+             {allVideos.length > 3 && (
+              <div className="text-center mt-12">
+                <Button size="lg" variant="outline" asChild className="button-hover" disabled>
+                  {/* <Link href="/videos">View All Videos</Link> */}
+                   View All Videos (Coming Soon)
+                </Button>
+              </div>
+            )}
           </div>
         </section>
       )}

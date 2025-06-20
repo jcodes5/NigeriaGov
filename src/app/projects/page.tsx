@@ -3,13 +3,15 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Project } from '@/types';
-import { getAllProjects, ministries, states } from '@/lib/data'; // ministries and states still from mock
+import { ministries, states } from '@/lib/data'; // ministries and states still from mock
 import { ProjectCard } from '@/components/projects/project-card';
 import { FilterControls } from '@/components/projects/filter-controls';
 import { Pagination } from '@/components/common/pagination';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton'; 
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
+import { fetchAllProjectsAction } from '@/lib/actions'; // Import the server action
 
 const ITEMS_PER_PAGE = 9;
 
@@ -24,11 +26,11 @@ export default function ProjectsPage() {
     const fetchProjects = async () => {
       setIsLoading(true);
       try {
-        const projectsData = await getAllProjects(); // Now fetches from DB
+        const projectsData = await fetchAllProjectsAction(); // Call the server action
         setAllProjects(projectsData);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
-        setAllProjects([]); // Set to empty array on error
+        setAllProjects([]); 
       } finally {
         setIsLoading(false);
       }
@@ -73,14 +75,12 @@ export default function ProjectsPage() {
   const applyFilters = (newFilters: { ministryId?: string; stateId?: string; date?: Date, status?: string }) => {
     setCurrentPage(1);
     setActiveFilters(newFilters);
-    // Filtering is now handled by the projectsToDisplay memo based on allProjects and activeFilters
   };
   
   const clearFilters = () => {
     setCurrentPage(1);
     setActiveFilters({});
     setSearchTerm('');
-    // No need to setFilteredProjects if filtering is done in projectsToDisplay memo
   }
 
   const paginatedProjects = useMemo(() => {

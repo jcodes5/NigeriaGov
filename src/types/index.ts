@@ -1,6 +1,6 @@
 
-// Removed: import type { Database } from "./supabase"; // No longer primary source for DB types with Prisma
-import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle } from '@prisma/client';
+import type { Project as PrismaProject, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo, SiteSetting as PrismaSiteSetting, User as PrismaUser } from '@prisma/client';
+import type * as LucideIcons from 'lucide-react';
 
 
 export interface Ministry {
@@ -13,37 +13,37 @@ export interface State {
   name: string;
 }
 
-// AppFeedback type, aligned with what Prisma will provide or what UI expects
 export interface Feedback {
   id: string;
   project_id: string;
-  user_id: string | null; // Can be null if feedback is anonymous or user not in DB
+  user_id: string | null; 
   user_name: string;
   comment: string;
   rating: number | null;
   sentiment_summary: string | null;
-  created_at: string; // ISO date string
-  user?: User; // Optional: if user data is joined/included
+  created_at: string; 
+  user?: User; 
 }
 
 
 export interface ImpactStat {
   label: string;
   value: string;
-  iconName?: string; // Store Lucide icon name
-  icon?: React.ElementType; // Resolved on client
+  iconName?: keyof typeof LucideIcons; 
+  icon?: React.ElementType; 
 }
 
 export interface Video {
   id: string;
   title: string;
-  url: string;
-  thumbnailUrl?: string;
-  description?: string;
-  dataAiHint?: string;
+  url: string; 
+  thumbnailUrl?: string | null;
+  description?: string | null;
+  dataAiHint?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Represents the data structure for the application, potentially mapped from Prisma
 export interface Project {
   id: string;
   title: string;
@@ -67,26 +67,28 @@ export interface Project {
   state_id?: string | null;
 }
 
-
+// Updated User type for NextAuth.js compatibility
 export interface User {
   id: string;
-  name: string | null;
-  email: string | null;
-  role: 'user' | 'admin' | null;
-  avatarUrl?: string | null;
-  created_at?: string | null; // ISO date string or null
+  name?: string | null;
+  email?: string | null;
+  emailVerified?: Date | null; // NextAuth.js uses DateTime for this
+  image?: string | null;       // NextAuth.js uses 'image' instead of 'avatarUrl'
+  role?: 'user' | 'admin' | null; // Kept from original
+  created_at?: string | null;  // Kept from original (string to match existing pattern, Prisma handles Date)
+  // sessions and accounts are typically managed by NextAuth.js internally and might not be directly exposed here unless needed.
 }
 
-// Updated to align with Prisma's Date object for publishedDate
+
 export interface NewsArticle {
   id: string;
   slug: string;
   title: string;
   summary: string;
-  imageUrl?: string | null; // Prisma might return null
-  dataAiHint?: string | null; // Prisma might return null
+  imageUrl?: string | null; 
+  dataAiHint?: string | null; 
   category: string;
-  publishedDate: Date; // Prisma returns Date objects
+  publishedDate: Date; 
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -98,15 +100,16 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  iconName?: string;
-  icon?: React.ElementType;
-  link?: string;
+  iconName?: keyof typeof LucideIcons | null; 
+  icon?: React.ElementType; 
+  link?: string | null;
   category: string;
-  imageUrl?: string;
-  dataAiHint?: string;
+  imageUrl?: string | null;
+  dataAiHint?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Zod schema for Project Form (can be defined here or in the form component)
 export const projectFormSchemaRaw = {
   title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(150),
   subtitle: (z: any) => z.string().min(10, "Subtitle must be at least 10 characters.").max(250),
@@ -124,7 +127,7 @@ export const projectFormSchemaRaw = {
     (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
     z.number().positive("Expenditure must be a positive number.").optional().nullable()
   ),
-  tags: (z: any) => z.string().optional(), // Comma-separated
+  tags: (z: any) => z.string().optional(), 
 };
 
 export type ProjectFormData = {
@@ -138,7 +141,7 @@ export type ProjectFormData = {
   description: string;
   budget?: number | null;
   expenditure?: number | null;
-  tags?: string; // Comma-separated string for the form
+  tags?: string; 
 };
 
 
@@ -154,7 +157,6 @@ export const newsArticleFormSchemaRaw = {
   dataAiHint: (z: any) => z.string().max(50, "AI hint too long.").optional().nullable(),
 };
 
-// For the form data, we might not include ID directly in Zod schema if it's passed separately
 export type NewsArticleFormData = {
   title: string;
   slug: string;
@@ -166,3 +168,50 @@ export type NewsArticleFormData = {
   dataAiHint?: string | null;
 };
 
+export const serviceFormSchemaRaw = {
+  title: (z: any) => z.string().min(3, "Title must be at least 3 characters.").max(150),
+  slug: (z: any) => z.string().min(3, "Slug must be at least 3 chars.").max(150)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens."),
+  summary: (z: any) => z.string().min(10, "Summary must be at least 10 characters.").max(500),
+  category: (z: any) => z.string().min(2, "Category must be at least 2 characters.").max(50),
+  link: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  imageUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  dataAiHint: (z: any) => z.string().max(50, "AI hint too long (max 2 words).").optional().nullable(),
+  iconName: (z: any) => z.string().max(50, "Icon name too long.").optional().nullable(),
+};
+
+export type ServiceFormData = {
+  title: string;
+  slug: string;
+  summary: string;
+  category: string;
+  link?: string | null;
+  imageUrl?: string | null;
+  dataAiHint?: string | null;
+  iconName?: keyof typeof LucideIcons | null;
+};
+
+export const videoFormSchemaRaw = {
+  title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(200),
+  url: (z: any) => z.string().url("Must be a valid embeddable URL (e.g., YouTube embed link)."),
+  thumbnailUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
+  dataAiHint: (z: any) => z.string().max(50, "AI hint for thumbnail too long (max 2 words).").optional().nullable(),
+  description: (z: any) => z.string().max(500, "Description too long.").optional().nullable(),
+};
+
+export type VideoFormData = {
+  title: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  dataAiHint?: string | null;
+  description?: string | null;
+};
+
+export interface SiteSettings {
+  id: string;
+  siteName: string | null;
+  maintenanceMode: boolean;
+  contactEmail: string | null;
+  footerMessage: string | null;
+  updatedAt: Date;
+}

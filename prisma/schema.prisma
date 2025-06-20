@@ -1,77 +1,164 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id         String     @id @unique // Matches Supabase auth.users.id
-  name       String?
-  email      String?    @unique
-  role       String? // 'user' or 'admin'
-  avatar_url String?
-  created_at DateTime?  @default(now())
-  updated_at DateTime?  @updatedAt
-  feedback   Feedback[] // Relation to Feedback model
+datasource db {
+  provider = "mysql" // Changed from "postgresql"
+  url      = env("DATABASE_URL")
+}
 
-  @@map("users") // Explicitly map to the 'users' table
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  password      String? // For credentials provider
+  role          String?   @default("user") // e.g., 'user', 'admin'
+  created_at    DateTime  @default(now()) @map("created_at")
+  updated_at    DateTime  @updatedAt @map("updated_at")
+
+  accounts Account[]
+  sessions Session[]
+  feedback Feedback[] // User can have multiple feedback entries
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model Project {
   id                  String     @id @default(uuid())
-  title               String
+  title               String     @unique // Assuming project titles should be unique
   subtitle            String
-  ministry_id         String?
-  state_id            String?
-  status              String // 'Ongoing', 'Completed', 'Planned', 'On Hold'
-  start_date          DateTime
-  expected_end_date   DateTime?
-  actual_end_date     DateTime?
+  ministry_id         String? // References a mock data ID for now
+  state_id            String? // References a mock data ID for now
+  status              String // e.g., 'Ongoing', 'Completed', 'Planned', 'On Hold'
+  start_date          DateTime   @default(now()) @map("start_date")
+  expected_end_date   DateTime?  @map("expected_end_date")
+  actual_end_date     DateTime?  @map("actual_end_date")
   description         String     @db.Text
-  images              Json? // Array of { url: string; alt: string; dataAiHint?: string }
-  videos              Json? // Array of Video type
-  impact_stats        Json? // Array of ImpactStat type (with iconName)
-  budget              Decimal?
-  expenditure         Decimal?
-  tags                String[] // Array of text
-  last_updated_at     DateTime   @default(now())
-  created_at          DateTime   @default(now())
-  feedback_list       Feedback[] @relation("ProjectFeedback") // Explicit relation name
+  images              Json?      // Store as JSON: { url: string, alt: string, dataAiHint?: string }[]
+  videos              Json?      // Store as JSON: { title: string, url: string, thumbnailUrl?: string }[]
+  impact_stats        Json?      // Store as JSON: { label: string, value: string, iconName?: string }[]
+  budget              Float?     // Using Float for monetary values
+  expenditure         Float?     // Using Float for monetary values
+  tags                String[]   @default([])
+  last_updated_at     DateTime   @updatedAt @map("last_updated_at")
+  created_at          DateTime   @default(now()) @map("created_at")
+  feedback_list       Feedback[] @relation("ProjectFeedback")
 
-  @@map("projects") // Explicitly map to the 'projects' table
+  @@map("projects")
 }
 
 model Feedback {
   id                String   @id @default(uuid())
-  project_id        String
-  user_id           String?
-  user_name         String
+  project_id        String   @map("project_id")
+  user_id           String?  @map("user_id") // Nullable if feedback can be anonymous or user deleted
+  user_name         String   @map("user_name")
   comment           String   @db.Text
   rating            Int?
-  sentiment_summary String?
-  created_at        DateTime @default(now())
+  sentiment_summary String?  @map("sentiment_summary") @db.Text
+  created_at        DateTime @default(now()) @map("created_at")
 
   project Project @relation("ProjectFeedback", fields: [project_id], references: [id], onDelete: Cascade)
-  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull) // SetNull if user is deleted
 
-  @@map("feedback") // Explicitly map to the 'feedback' table
+  @@map("feedback")
 }
 
 model NewsArticle {
-  id            String    @id @default(uuid())
-  slug          String    @unique
+  id            String   @id @default(uuid())
+  slug          String   @unique
   title         String
-  summary       String    @db.Text
-  imageUrl      String?   @map("image_url")
-  dataAiHint    String?   @map("data_ai_hint")
+  summary       String   @db.Text
+  imageUrl      String?  @map("image_url")
+  dataAiHint    String?  @map("data_ai_hint")
   category      String
-  publishedDate DateTime  @map("published_date")
-  content       String    @db.Text
+  publishedDate DateTime @map("published_date")
+  content       String   @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("news_articles")
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  summary     String   @db.Text
+  iconName    String?  @map("icon_name")
+  link        String?
+  category    String
+  imageUrl    String?  @map("image_url")
+  dataAiHint  String?  @map("data_ai_hint")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("services")
+}
+
+model Video {
+  id            String    @id @default(uuid())
+  title         String
+  url           String
+  thumbnailUrl  String?   @map("thumbnail_url")
+  dataAiHint    String?   @map("data_ai_hint")
+  description   String?   @db.Text
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  @@map("news_articles")
+  @@map("videos")
+}
+
+model SiteSetting {
+  id              String    @id @default("global_settings")
+  siteName        String?   @map("site_name")
+  maintenanceMode Boolean   @default(false) @map("maintenance_mode")
+  contactEmail    String?   @map("contact_email")
+  footerMessage   String?   @db.Text @map("footer_message")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("site_settings")
 }

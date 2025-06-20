@@ -4,7 +4,7 @@ import './globals.css';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/context/auth-context';
+import { SessionProvider } from 'next-auth/react'; // Import SessionProvider
 
 export const metadata: Metadata = {
   title: 'NigeriaGovHub - See What Nigeria is Building',
@@ -24,14 +24,14 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased flex flex-col min-h-screen overflow-x-hidden">
-        <AuthProvider>
+        <SessionProvider> {/* Wrap with SessionProvider */}
           <Header />
           <main className="flex-grow container mx-auto px-4 py-8">
             {children}
           </main>
           <Footer />
           <Toaster />
-        </AuthProvider>
+        </SessionProvider>
       </body>
     </html>
   );

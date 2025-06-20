@@ -1,8 +1,8 @@
 
-import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem, ProjectFormData } from '@/types';
-import { Briefcase, Users, DollarSign, TrendingUp, MapPin, CalendarDays, Flag, ShieldCheck, BookOpen, Heart, Building, Globe, Plane, Award, Rss, MessageCircle, PersonStanding, Construction, CheckCircle, Zap } from 'lucide-react';
+import type { Ministry, State, Project as AppProject, Feedback as AppFeedback, ImpactStat, Video as AppVideo, User as AppUser, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, ProjectFormData, SiteSettings } from '@/types';
+import * as LucideIcons from 'lucide-react';
 import prisma from './prisma';
-import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle } from '@prisma/client';
+import type { Project as PrismaProject, Feedback as PrismaFeedback, User as PrismaUser, NewsArticle as PrismaNewsArticle, Service as PrismaService, Video as PrismaVideo, SiteSetting as PrismaSiteSetting } from '@prisma/client';
 
 // --- Mock Data for Ministries and States (These will eventually move to DB) ---
 export const ministries: Ministry[] = [
@@ -33,22 +33,8 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
   const state = states.find(s => s.id === prismaProject.state_id) || { id: prismaProject.state_id || 'unknown_state', name: prismaProject.state_id || 'Unknown State' };
 
   const mappedImpactStats = (prismaProject.impact_stats as unknown as ImpactStat[] || []).map(stat => {
-    let iconComponent;
-    switch (stat.iconName) {
-      case 'Briefcase': iconComponent = Briefcase; break;
-      case 'Users': iconComponent = Users; break;
-      case 'DollarSign': iconComponent = DollarSign; break;
-      case 'TrendingUp': iconComponent = TrendingUp; break;
-      case 'MapPin': iconComponent = MapPin; break;
-      case 'CalendarDays': iconComponent = CalendarDays; break;
-      case 'Flag': iconComponent = Flag; break;
-      case 'PersonStanding': iconComponent = PersonStanding; break;
-      case 'Construction': iconComponent = Construction; break;
-      case 'CheckCircle': iconComponent = CheckCircle; break;
-      case 'Zap': iconComponent = Zap; break;
-      default: iconComponent = TrendingUp;
-    }
-    return { ...stat, icon: iconComponent };
+    const IconComponent = stat.iconName && LucideIcons[stat.iconName as keyof typeof LucideIcons] ? LucideIcons[stat.iconName as keyof typeof LucideIcons] : LucideIcons.TrendingUp;
+    return { ...stat, icon: IconComponent };
   });
 
   return {
@@ -63,10 +49,10 @@ const mapPrismaProjectToAppProject = (prismaProject: PrismaProject & { feedback_
     actualEndDate: prismaProject.actual_end_date ? new Date(prismaProject.actual_end_date) : undefined,
     description: prismaProject.description,
     images: (prismaProject.images as unknown as { url: string; alt: string, dataAiHint?: string }[] || []),
-    videos: (prismaProject.videos as unknown as Video[] || []),
+    videos: (prismaProject.videos as unknown as AppVideo[] || []),
     impactStats: mappedImpactStats,
-    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined, 
-    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined, 
+    budget: prismaProject.budget ? Number(prismaProject.budget) : undefined,
+    expenditure: prismaProject.expenditure ? Number(prismaProject.expenditure) : undefined,
     tags: prismaProject.tags || [],
     lastUpdatedAt: new Date(prismaProject.last_updated_at),
     feedback: prismaProject.feedback_list?.map(mapPrismaFeedbackToAppFeedback) || [],
@@ -89,15 +75,16 @@ const mapPrismaFeedbackToAppFeedback = (prismaFeedback: PrismaFeedback): AppFeed
   };
 };
 
-// --- Helper function to map Prisma User to AppUser ---
+// --- Helper function to map Prisma User to AppUser (NextAuth.js compatible) ---
 const mapPrismaUserToAppUser = (prismaUser: PrismaUser): AppUser => {
   return {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
-    role: prismaUser.role as AppUser['role'] | null,
-    avatarUrl: prismaUser.avatar_url,
-    created_at: prismaUser.created_at ? new Date(prismaUser.created_at).toISOString() : null,
+    emailVerified: prismaUser.emailVerified, // From NextAuth.js schema
+    image: prismaUser.image,                 // From NextAuth.js schema (replaces avatar_url)
+    role: prismaUser.role as AppUser['role'] | null, // Kept from original
+    created_at: prismaUser.created_at ? new Date(prismaUser.created_at).toISOString() : null, // Kept from original
   };
 };
 
@@ -108,13 +95,60 @@ const mapPrismaNewsToAppNews = (prismaNews: PrismaNewsArticle): AppNewsArticle =
     slug: prismaNews.slug,
     title: prismaNews.title,
     summary: prismaNews.summary,
-    imageUrl: prismaNews.image_url, 
-    dataAiHint: prismaNews.data_ai_hint, 
+    imageUrl: prismaNews.imageUrl,
+    dataAiHint: prismaNews.dataAiHint,
     category: prismaNews.category,
-    publishedDate: new Date(prismaNews.published_date), 
+    publishedDate: new Date(prismaNews.publishedDate),
     content: prismaNews.content,
-    createdAt: new Date(prismaNews.created_at),
-    updatedAt: new Date(prismaNews.updated_at),
+    createdAt: new Date(prismaNews.createdAt),
+    updatedAt: new Date(prismaNews.updatedAt),
+  };
+};
+
+// --- Helper function to map Prisma Service to AppServiceItem ---
+const mapPrismaServiceToAppServiceItem = (prismaService: PrismaService): AppServiceItem => {
+  const IconComponent = prismaService.iconName && LucideIcons[prismaService.iconName as keyof typeof LucideIcons]
+    ? LucideIcons[prismaService.iconName as keyof typeof LucideIcons]
+    : LucideIcons.Server; // Default icon
+
+  return {
+    id: prismaService.id,
+    slug: prismaService.slug,
+    title: prismaService.title,
+    summary: prismaService.summary,
+    iconName: prismaService.iconName as keyof typeof LucideIcons || null,
+    icon: IconComponent,
+    link: prismaService.link,
+    category: prismaService.category,
+    imageUrl: prismaService.imageUrl,
+    dataAiHint: prismaService.dataAiHint,
+    createdAt: new Date(prismaService.createdAt),
+    updatedAt: new Date(prismaService.updatedAt),
+  };
+};
+
+// --- Helper function to map Prisma Video to AppVideo ---
+const mapPrismaVideoToAppVideo = (prismaVideo: PrismaVideo): AppVideo => {
+  return {
+    id: prismaVideo.id,
+    title: prismaVideo.title,
+    url: prismaVideo.url,
+    thumbnailUrl: prismaVideo.thumbnailUrl,
+    dataAiHint: prismaVideo.dataAiHint,
+    description: prismaVideo.description,
+    createdAt: new Date(prismaVideo.createdAt),
+    updatedAt: new Date(prismaVideo.updatedAt),
+  };
+};
+
+const mapPrismaSiteSettingToAppSiteSetting = (prismaSetting: PrismaSiteSetting): SiteSettings => {
+  return {
+    id: prismaSetting.id,
+    siteName: prismaSetting.siteName,
+    maintenanceMode: prismaSetting.maintenanceMode,
+    contactEmail: prismaSetting.contactEmail,
+    footerMessage: prismaSetting.footerMessage,
+    updatedAt: new Date(prismaSetting.updatedAt),
   };
 };
 
@@ -125,7 +159,7 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     const projectWithFeedback = await prisma.project.findUnique({
       where: { id },
       include: {
-        feedback_list: { 
+        feedback_list: {
           orderBy: { created_at: 'desc' },
         },
       },
@@ -135,7 +169,7 @@ export const getProjectById = async (id: string): Promise<AppProject | null> => 
     return mapPrismaProjectToAppProject(projectWithFeedback);
   } catch (error) {
     console.error('Error fetching project by ID with Prisma:', error);
-    return null; 
+    return null;
   }
 };
 
@@ -143,7 +177,7 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
   try {
     const prismaProjects = await prisma.project.findMany({
       orderBy: {
-        last_updated_at: 'desc', 
+        last_updated_at: 'desc',
       },
     });
     return prismaProjects.map(mapPrismaProjectToAppProject);
@@ -155,6 +189,9 @@ export const getAllProjects = async (): Promise<AppProject[]> => {
 
 export type ProjectCreationData = Omit<PrismaProject, 'id' | 'created_at' | 'last_updated_at' | 'images' | 'videos' | 'impact_stats' | 'feedback_list'> & {
   tags?: string[];
+  images?: any;
+  videos?: any;
+  impact_stats?: any;
 };
 
 export const createProjectInDb = async (projectData: ProjectCreationData): Promise<AppProject | null> => {
@@ -162,54 +199,53 @@ export const createProjectInDb = async (projectData: ProjectCreationData): Promi
     const newProject = await prisma.project.create({
       data: {
         ...projectData,
-        budget: projectData.budget ?? undefined, 
+        budget: projectData.budget ?? undefined,
         expenditure: projectData.expenditure ?? undefined,
-        images: [], 
-        videos: [], 
-        impact_stats: [], 
+        images: projectData.images || [],
+        videos: projectData.videos || [],
+        impact_stats: projectData.impact_stats || [],
       },
     });
     return mapPrismaProjectToAppProject(newProject);
   } catch (error) {
     console.error('Error creating project in DB with Prisma:', error);
-    return null;
+    throw error;
   }
 };
 
 export const updateProjectInDb = async (id: string, projectData: Partial<ProjectCreationData>): Promise<AppProject | null> => {
   try {
     const dataToUpdate = { ...projectData };
-    // Ensure dates are Date objects if provided
     if (dataToUpdate.start_date && typeof dataToUpdate.start_date === 'string') {
       dataToUpdate.start_date = new Date(dataToUpdate.start_date);
     }
     if (dataToUpdate.expected_end_date && typeof dataToUpdate.expected_end_date === 'string') {
       dataToUpdate.expected_end_date = new Date(dataToUpdate.expected_end_date);
     }
-    
+    const budget = dataToUpdate.budget === undefined ? null : Number(dataToUpdate.budget);
+    const expenditure = dataToUpdate.expenditure === undefined ? null : Number(dataToUpdate.expenditure);
+
+
     const updatedProject = await prisma.project.update({
       where: { id },
       data: {
         ...dataToUpdate,
-        budget: dataToUpdate.budget ?? undefined,
-        expenditure: dataToUpdate.expenditure ?? undefined,
-        // images, videos, impact_stats are not updated via this simple form for now
+        budget: budget,
+        expenditure: expenditure,
       },
     });
     return mapPrismaProjectToAppProject(updatedProject);
   } catch (error) {
     console.error(`Error updating project with ID "${id}" in DB with Prisma:`, error);
-    return null;
+    throw error;
   }
 };
 
 export const deleteProjectFromDb = async (id: string): Promise<boolean> => {
   try {
-    // First, delete related feedback to avoid foreign key constraint violations
     await prisma.feedback.deleteMany({
       where: { project_id: id },
     });
-    // Then delete the project
     await prisma.project.delete({
       where: { id },
     });
@@ -248,7 +284,7 @@ export const getAllFeedbackWithProjectTitles = async (): Promise<Array<AppFeedba
   try {
     const feedbackWithProjects = await prisma.feedback.findMany({
       include: {
-        project: { 
+        project: {
           select: { title: true },
         },
       },
@@ -283,70 +319,23 @@ export async function deleteUserById(userId: string): Promise<{ success: boolean
   try {
      await prisma.feedback.updateMany({
       where: { user_id: userId },
-      data: { user_id: null },
+      data: { user_id: null }, 
     });
+    // With NextAuth.js and PrismaAdapter, related Accounts and Sessions are often set up with onDelete: Cascade
+    // So deleting the User in Prisma should cascade to accounts and sessions.
     await prisma.user.delete({
       where: { id: userId },
     });
     return { success: true };
   } catch (error) {
-    console.error('Error deleting user with Prisma:', error);
+    console.error('Error deleting user profile or disassociating feedback with Prisma:', error);
     return { success: false, error };
   }
 }
 
-export async function createUserProfileInDb(userData: Omit<PrismaUser, 'created_at' | 'updated_at' | 'avatar_url'> & { avatar_url?: string | null }): Promise<AppUser | null> {
-  try {
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userData.id },
-    });
-
-    if (existingUser) {
-      // User profile already exists. Update name or avatar if they differ.
-      const dataToUpdate: { name?: string | null; avatar_url?: string | null } = {};
-      let needsUpdate = false;
-
-      if (userData.name !== existingUser.name) {
-        dataToUpdate.name = userData.name;
-        needsUpdate = true;
-      }
-      if (userData.avatar_url !== existingUser.avatar_url) {
-        dataToUpdate.avatar_url = userData.avatar_url;
-        needsUpdate = true;
-      }
-      // Do not update email or role here as part of a generic sync/create.
-      // Email is critical and its uniqueness handled by P2002 check in syncUserProfile.
-      // Role is 'user' on creation.
-
-      if (needsUpdate) {
-        const updatedUser = await prisma.user.update({
-          where: { id: userData.id },
-          data: dataToUpdate,
-        });
-        return mapPrismaUserToAppUser(updatedUser);
-      }
-      // No update needed, return the existing user data mapped to AppUser
-      return mapPrismaUserToAppUser(existingUser);
-    } else {
-      // User profile does not exist, create it
-      const newUser = await prisma.user.create({
-        data: {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email, // Email must be provided for new user
-          role: userData.role || 'user', // Default to 'user' if not provided from syncUserProfile
-          avatar_url: userData.avatar_url,
-        },
-      });
-      return mapPrismaUserToAppUser(newUser);
-    }
-  } catch (error) {
-    console.error('Error in createUserProfileInDb:', error); // Log the detailed error
-    throw error; // Re-throw to be caught and handled more specifically by syncUserProfile
-  }
-}
-
-
+// This function's role changes with NextAuth.js.
+// The PrismaAdapter handles user creation/linking during OAuth or credential sign-in.
+// This might be used if you need to fetch a user profile directly by ID outside of session context.
 export async function getUserProfileFromDb(userId: string): Promise<AppUser | null> {
   try {
     const user = await prisma.user.findUnique({
@@ -388,7 +377,7 @@ export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   try {
     const newsArticles = await prisma.newsArticle.findMany({
       orderBy: {
-        published_date: 'desc',
+        publishedDate: 'desc',
       },
     });
     return newsArticles.map(mapPrismaNewsToAppNews);
@@ -398,43 +387,43 @@ export const getAllNewsArticles = async (): Promise<AppNewsArticle[]> => {
   }
 };
 
-export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'created_at' | 'updated_at'>;
+export type NewsArticleCreationData = Omit<PrismaNewsArticle, 'id' | 'createdAt' | 'updatedAt'>;
 
 export const createNewsArticleInDb = async (newsData: NewsArticleCreationData): Promise<AppNewsArticle | null> => {
   try {
     const newArticle = await prisma.newsArticle.create({
       data: {
         ...newsData,
-        image_url: newsData.image_url || null, 
-        data_ai_hint: newsData.data_ai_hint || null, 
+        imageUrl: newsData.imageUrl || null,
+        dataAiHint: newsData.dataAiHint || null,
       }
     });
     return mapPrismaNewsToAppNews(newArticle);
   } catch (error) {
     console.error('Error creating news article in DB with Prisma:', error);
-    return null;
+    throw error;
   }
 };
 
 export const updateNewsArticleInDb = async (id: string, newsData: Partial<NewsArticleCreationData>): Promise<AppNewsArticle | null> => {
   try {
     const dataToUpdate = { ...newsData };
-    if (dataToUpdate.published_date && typeof dataToUpdate.published_date === 'string') {
-      dataToUpdate.published_date = new Date(dataToUpdate.published_date);
+    if (dataToUpdate.publishedDate && typeof dataToUpdate.publishedDate === 'string') {
+      dataToUpdate.publishedDate = new Date(dataToUpdate.publishedDate);
     }
-    
+
     const updatedArticle = await prisma.newsArticle.update({
       where: { id },
       data: {
         ...dataToUpdate,
-        image_url: dataToUpdate.image_url === '' ? null : dataToUpdate.image_url,
-        data_ai_hint: dataToUpdate.data_ai_hint === '' ? null : dataToUpdate.data_ai_hint,
+        imageUrl: dataToUpdate.imageUrl === '' ? null : dataToUpdate.imageUrl,
+        dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
       },
     });
     return mapPrismaNewsToAppNews(updatedArticle);
   } catch (error) {
     console.error(`Error updating news article with ID "${id}" in DB with Prisma:`, error);
-    return null;
+    throw error;
   }
 };
 
@@ -451,47 +440,219 @@ export const deleteNewsArticleFromDb = async (id: string): Promise<boolean> => {
 };
 
 
-// --- Services (Still using mock data, to be migrated to Prisma) ---
-export const mockServices: ServiceItem[] = [
-  {
-    id: 'service1',
-    slug: 'apply-for-passport',
-    title: 'Apply for International Passport',
-    summary: 'Access the portal to apply for or renew your Nigerian international passport.',
-    icon: Plane,
-    category: 'Immigration',
-    link: '#', // Placeholder
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'passport document',
-  },
-  {
-    id: 'service2',
-    slug: 'file-taxes-online',
-    title: 'File Taxes Online (e-FIRS)',
-    summary: 'Use the Federal Inland Revenue Service portal to file your tax returns.',
-    icon: Briefcase, 
-    category: 'Taxation',
-    link: '#', // Placeholder
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'tax document',
-  },
-];
-
-export const getAllServices = (): ServiceItem[] => {
-  console.warn("getAllServices is using mock data.");
-  return mockServices;
+// --- Services Data Functions (Prisma Integrated) ---
+export const getAllServices = async (): Promise<AppServiceItem[]> => {
+  try {
+    const prismaServices = await prisma.service.findMany({
+      orderBy: {
+        title: 'asc',
+      },
+    });
+    return prismaServices.map(mapPrismaServiceToAppServiceItem);
+  } catch (error) {
+    console.error('Error fetching all services with Prisma:', error);
+    return [];
+  }
 };
 
-export const getServiceBySlug = (slug: string): ServiceItem | undefined => {
-  console.warn("getServiceBySlug is using mock data.");
-  return mockServices.find(service => service.slug === slug);
+export const getServiceBySlug = async (slug: string): Promise<AppServiceItem | undefined> => {
+  try {
+    const prismaService = await prisma.service.findUnique({
+      where: { slug },
+    });
+    return prismaService ? mapPrismaServiceToAppServiceItem(prismaService) : undefined;
+  } catch (error) {
+    console.error(`Error fetching service by slug "${slug}" with Prisma:`, error);
+    return undefined;
+  }
 };
 
-// --- Mock Data (to be phased out as features are migrated) ---
-export const MOCK_PROJECTS_TEMP: AppProject[] = []; 
-export const mockFeaturedVideos: Video[] = [
-  { id: 'fv1', title: 'Nigeria\'s Vision 2050', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'futuristic city', description: 'A look into Nigeria\'s long-term development plan.' },
-  { id: 'fv2', title: 'Agricultural Revolution Initiatives', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'farm tractor', description: 'Boosting food security and empowering farmers.' },
-  { id: 'fv3', title: 'Digital Nigeria: Connecting the Nation', url: 'https://www.youtube.com/embed/rokGy0huYEA', thumbnailUrl: 'https://placehold.co/300x200.png', dataAiHint: 'data network', description: 'Expanding digital infrastructure and literacy.' },
-];
+export const getServiceById = async (id: string): Promise<AppServiceItem | null> => {
+  try {
+    const service = await prisma.service.findUnique({
+      where: { id },
+    });
+    return service ? mapPrismaServiceToAppServiceItem(service) : null;
+  } catch (error) {
+    console.error(`Error fetching service by ID "${id}" with Prisma:`, error);
+    return null;
+  }
+};
 
+export type ServiceCreationData = Omit<PrismaService, 'id' | 'createdAt' | 'updatedAt'>;
+
+export const createServiceInDb = async (serviceData: ServiceCreationData): Promise<AppServiceItem | null> => {
+  try {
+    const newService = await prisma.service.create({
+      data: {
+        ...serviceData,
+        iconName: serviceData.iconName || null,
+        link: serviceData.link || null,
+        imageUrl: serviceData.imageUrl || null,
+        dataAiHint: serviceData.dataAiHint || null,
+      }
+    });
+    return mapPrismaServiceToAppServiceItem(newService);
+  } catch (error) {
+    console.error('Error creating service in DB with Prisma:', error);
+    throw error;
+  }
+};
+
+export const updateServiceInDb = async (id: string, serviceData: Partial<ServiceCreationData>): Promise<AppServiceItem | null> => {
+  try {
+    const dataToUpdate = {...serviceData}; 
+    const updatedService = await prisma.service.update({
+      where: { id },
+      data: {
+        ...dataToUpdate,
+        iconName: dataToUpdate.iconName === '' ? null : dataToUpdate.iconName,
+        link: dataToUpdate.link === '' ? null : dataToUpdate.link,
+        imageUrl: dataToUpdate.imageUrl === '' ? null : dataToUpdate.imageUrl,
+        dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
+      },
+    });
+    return mapPrismaServiceToAppServiceItem(updatedService);
+  } catch (error) {
+    console.error(`Error updating service with ID "${id}" in DB with Prisma:`, error);
+    throw error;
+  }
+};
+
+export const deleteServiceFromDb = async (id: string): Promise<boolean> => {
+  try {
+    await prisma.service.delete({
+      where: { id },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting service with ID "${id}" from DB with Prisma:`, error);
+    return false;
+  }
+};
+
+// --- Video Data Functions (Prisma Integrated) ---
+export const getAllVideosFromDb = async (): Promise<AppVideo[]> => {
+  try {
+    const prismaVideos = await prisma.video.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    return prismaVideos.map(mapPrismaVideoToAppVideo);
+  } catch (error) {
+    console.error('Error fetching all videos with Prisma:', error);
+    return [];
+  }
+};
+
+export const getVideoById = async (id: string): Promise<AppVideo | null> => {
+  try {
+    const video = await prisma.video.findUnique({
+      where: { id },
+    });
+    return video ? mapPrismaVideoToAppVideo(video) : null;
+  } catch (error) {
+    console.error(`Error fetching video by ID "${id}" with Prisma:`, error);
+    return null;
+  }
+};
+
+export type VideoCreationData = Omit<PrismaVideo, 'id' | 'createdAt' | 'updatedAt'>;
+
+export const createVideoInDb = async (videoData: VideoCreationData): Promise<AppVideo | null> => {
+  try {
+    const newVideo = await prisma.video.create({
+      data: {
+        ...videoData,
+        thumbnailUrl: videoData.thumbnailUrl || null,
+        dataAiHint: videoData.dataAiHint || null,
+        description: videoData.description || null,
+      }
+    });
+    return mapPrismaVideoToAppVideo(newVideo);
+  } catch (error) {
+    console.error('Error creating video in DB with Prisma:', error);
+    throw error;
+  }
+};
+
+export const updateVideoInDb = async (id: string, videoData: Partial<VideoCreationData>): Promise<AppVideo | null> => {
+  try {
+    const dataToUpdate = { ...videoData };
+    const updatedVideo = await prisma.video.update({
+      where: { id },
+      data: {
+        ...dataToUpdate,
+        thumbnailUrl: dataToUpdate.thumbnailUrl === '' ? null : dataToUpdate.thumbnailUrl,
+        dataAiHint: dataToUpdate.dataAiHint === '' ? null : dataToUpdate.dataAiHint,
+        description: dataToUpdate.description === '' ? null : dataToUpdate.description,
+      },
+    });
+    return mapPrismaVideoToAppVideo(updatedVideo);
+  } catch (error) {
+    console.error(`Error updating video with ID "${id}" in DB with Prisma:`, error);
+    throw error;
+  }
+};
+
+export const deleteVideoFromDb = async (id: string): Promise<boolean> => {
+  try {
+    await prisma.video.delete({
+      where: { id },
+    });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting video with ID "${id}" from DB with Prisma:`, error);
+    return false;
+  }
+};
+
+// --- Site Settings Data Functions ---
+const SITE_SETTINGS_ID = "global_settings";
+
+export const getSiteSettingsFromDb = async (): Promise<SiteSettings | null> => {
+  try {
+    const settings = await prisma.siteSetting.findUnique({
+      where: { id: SITE_SETTINGS_ID },
+    });
+    if (settings) {
+      return mapPrismaSiteSettingToAppSiteSetting(settings);
+    }
+    return { 
+      id: SITE_SETTINGS_ID,
+      siteName: "NigeriaGovHub",
+      maintenanceMode: false,
+      contactEmail: "info@example.com",
+      footerMessage: `© ${new Date().getFullYear()} NigeriaGovHub. All rights reserved.`,
+      updatedAt: new Date(),
+    };
+  } catch (error) {
+    console.error("Error fetching site settings from DB:", error);
+    return null; 
+  }
+};
+
+export const updateSiteSettingsInDb = async (settingsData: Partial<Omit<SiteSettings, 'id' | 'updatedAt'>>): Promise<SiteSettings | null> => {
+  try {
+    const dataToUpsert = {
+      siteName: settingsData.siteName,
+      maintenanceMode: settingsData.maintenanceMode,
+      contactEmail: settingsData.contactEmail,
+      footerMessage: settingsData.footerMessage,
+    };
+
+    const updatedSettings = await prisma.siteSetting.upsert({
+      where: { id: SITE_SETTINGS_ID },
+      update: dataToUpsert,
+      create: {
+        id: SITE_SETTINGS_ID,
+        ...dataToUpsert,
+      },
+    });
+    return mapPrismaSiteSettingToAppSiteSetting(updatedSettings);
+  } catch (error) {
+    console.error("Error updating site settings in DB:", error);
+    throw error;
+  }
+};

@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { Logo } from '@/components/common/logo';
 import { LanguageToggle } from '@/components/common/language-toggle';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/context/auth-context';
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, LogIn, LogOut, UserPlus, ChevronDown, Newspaper, Briefcase, Heart, Landmark, Scale, Users, Globe, Palette, Bike, MessageSquare, Menu // Added Menu
+  LayoutDashboard, LogIn, LogOut, UserPlus, ChevronDown, Newspaper, Briefcase, Heart, Landmark, Scale, Users, Globe, Palette, Bike, MessageSquare, Menu
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -66,12 +66,14 @@ const NavDropdown = ({ label, icon: Icon, items }: { label: string; icon?: React
 
 
 export function Header() {
-  const { user, logout, isLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const user = session?.user;
+  const isLoading = status === "loading";
+
 
   const handleLogout = () => {
-    logout();
-    router.push('/');
+    signOut({ callbackUrl: '/' });
   };
 
   const publicServicesItems = [
@@ -170,7 +172,7 @@ const MobileNav = () => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon">
-          <Menu className="h-5 w-5" /> {/* Changed from ChevronDown to Menu */}
+          <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle menu</span>
         </Button>
       </DropdownMenuTrigger>

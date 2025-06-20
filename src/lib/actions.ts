@@ -6,20 +6,31 @@ import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from
 import { 
   addFeedbackToProject as saveFeedbackToDb, 
   deleteUserById as removeUserFromDb,
-  createUserProfileInDb,
   getUserProfileFromDb,
   createProjectInDb as saveProjectToDb, 
   updateProjectInDb,
   deleteProjectFromDb,
+  getAllProjects as fetchAllProjectsFromDb, 
   type ProjectCreationData,
   createNewsArticleInDb as saveNewsArticleToDb, 
   type NewsArticleCreationData,
   updateNewsArticleInDb,
   deleteNewsArticleFromDb,
+  createServiceInDb as saveServiceToDb,
+  type ServiceCreationData,
+  updateServiceInDb,
+  deleteServiceFromDb,
+  createVideoInDb as saveVideoToDb,
+  type VideoCreationData,
+  updateVideoInDb,
+  deleteVideoFromDb,
+  getSiteSettingsFromDb,
+  updateSiteSettingsInDb,
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, NewsArticleFormData, ProjectFormData } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData, SiteSettings } from '@/types';
+import type { SiteSettingsFormData } from '@/app/dashboard/admin/site-settings/page';
 import prisma from './prisma';
-
+import bcrypt from 'bcryptjs'; // For password hashing
 
 export interface SubmitFeedbackResult {
   success: boolean;
@@ -84,7 +95,7 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
 
     if (success) {
       revalidatePath("/dashboard/admin/manage-users");
-      return { success: true, message: "User profile deleted successfully from public table." };
+      return { success: true, message: "User profile deleted successfully." };
     } else {
       console.error("Prisma delete error (public.users):", error);
       return { success: false, message: `Failed to delete user profile: ${error?.message || 'Unknown error'}` };
@@ -99,34 +110,6 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   }
 }
 
-export async function syncUserProfile(
-  data: { userId: string; email: string; name: string; avatarUrl?: string | null }
-): Promise<{ user: AppUser | null; error: string | null }> {
-  try {
-    const profile = await createUserProfileInDb({
-      id: data.userId,
-      email: data.email,
-      name: data.name,
-      role: 'user', 
-      avatar_url: data.avatarUrl || null,
-    });
-    if (profile) {
-      return { user: profile, error: null };
-    }
-    return { user: null, error: "Failed to create user profile." };
-  } catch (error) {
-    console.error("Error syncing user profile:", error);
-    if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('email')) {
-      return { user: null, error: "A user with this email may already exist. If this is you, try logging in." };
-    }
-     if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('PRIMARY')) {
-      const existingUser = await getUserProfileFromDb(data.userId);
-      if (existingUser) return { user: existingUser, error: null }; 
-      return { user: null, error: "User profile already exists, but could not be retrieved." };
-    }
-    return { user: null, error: error instanceof Error ? error.message : "An unknown error occurred during profile sync." };
-  }
-}
 
 export async function getUserProfile(userId: string): Promise<AppUser | null> {
   try {
@@ -138,7 +121,6 @@ export async function getUserProfile(userId: string): Promise<AppUser | null> {
   }
 }
 
-// Server Action Result Type
 interface ActionResult<T = null> {
   success: boolean;
   message: string;
@@ -162,6 +144,9 @@ export async function addProject(
       budget: formData.budget,
       expenditure: formData.expenditure,
       tags: formData.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
+      images: [], 
+      videos: [],
+      impact_stats: [],
     };
 
     const newProject = await saveProjectToDb(dataToSave);
@@ -256,9 +241,9 @@ export async function addNewsArticle(
 
     const dataToSave: NewsArticleCreationData = {
       ...newsData,
-      published_date: newsData.publishedDate, 
-      image_url: newsData.imageUrl,
-      data_ai_hint: newsData.dataAiHint,
+      publishedDate: newsData.publishedDate, 
+      imageUrl: newsData.imageUrl,
+      dataAiHint: newsData.dataAiHint,
     };
 
     const newArticle = await saveNewsArticleToDb(dataToSave);
@@ -303,9 +288,9 @@ export async function updateNewsArticle(
     
     const dataToUpdate: Partial<NewsArticleCreationData> = {
       ...newsData,
-      published_date: newsData.publishedDate,
-      image_url: newsData.imageUrl,
-      data_ai_hint: newsData.dataAiHint,
+      publishedDate: newsData.publishedDate,
+      imageUrl: newsData.imageUrl,
+      dataAiHint: newsData.dataAiHint,
     };
 
 
@@ -350,3 +335,306 @@ export async function deleteNewsArticle(id: string): Promise<ActionResult> {
   }
 }
 
+export async function addService(
+  serviceData: ServiceFormData
+): Promise<ActionResult<AppServiceItem>> {
+  try {
+    const existingServiceBySlug = await prisma.service.findUnique({ where: { slug: serviceData.slug } });
+    if (existingServiceBySlug) {
+      return { success: false, message: `A service with the slug "${serviceData.slug}" already exists.` };
+    }
+
+    const dataToSave: ServiceCreationData = {
+      ...serviceData,
+    };
+
+    const newService = await saveServiceToDb(dataToSave);
+    if (!newService) {
+      return { success: false, message: 'Failed to save service to the database.' };
+    }
+
+    revalidatePath('/services');
+    revalidatePath(`/services/${newService.slug}`);
+    revalidatePath('/dashboard/admin/manage-services');
+    revalidatePath('/');
+    return { success: true, message: 'Service added successfully!', item: newService };
+  } catch (error) {
+    console.error('Error adding service:', error);
+    let errorMessage = 'An unexpected error occurred while adding the service.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('slug')) {
+        errorMessage = 'A service with this slug already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function updateService(
+  id: string,
+  serviceData: ServiceFormData
+): Promise<ActionResult<AppServiceItem>> {
+  try {
+    if (serviceData.slug) {
+      const existingServiceBySlug = await prisma.service.findFirst({
+        where: {
+          slug: serviceData.slug,
+          id: { not: id }
+        }
+      });
+      if (existingServiceBySlug) {
+        return { success: false, message: `Another service with the slug "${serviceData.slug}" already exists.` };
+      }
+    }
+
+    const dataToUpdate: Partial<ServiceCreationData> = {
+      ...serviceData,
+    };
+
+    const updatedService = await updateServiceInDb(id, dataToUpdate);
+    if (!updatedService) {
+      return { success: false, message: 'Failed to update service in the database.' };
+    }
+
+    revalidatePath('/services');
+    revalidatePath(`/services/${updatedService.slug}`);
+    revalidatePath('/dashboard/admin/manage-services');
+    revalidatePath('/');
+    return { success: true, message: 'Service updated successfully!', item: updatedService };
+  } catch (error) {
+    console.error('Error updating service:', error);
+    let errorMessage = 'An unexpected error occurred while updating the service.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('slug')) {
+        errorMessage = 'A service with this slug already exists.';
+      }
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function deleteService(id: string): Promise<ActionResult> {
+  try {
+    const success = await deleteServiceFromDb(id);
+    if (!success) {
+      return { success: false, message: 'Failed to delete service from the database.' };
+    }
+
+    revalidatePath('/services');
+    revalidatePath('/dashboard/admin/manage-services');
+    revalidatePath('/');
+    return { success: true, message: 'Service deleted successfully!' };
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    return { success: false, message: 'An unexpected error occurred while deleting the service.', errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function fetchAllProjectsAction(): Promise<AppProject[]> {
+  try {
+    return await fetchAllProjectsFromDb();
+  } catch (error) {
+    console.error("Error fetching all projects in action:", error);
+    throw new Error("Failed to fetch projects via action.");
+  }
+}
+
+export async function addVideo(
+  videoData: VideoFormData
+): Promise<ActionResult<AppVideo>> {
+  try {
+    const dataToSave: VideoCreationData = {
+      ...videoData,
+      thumbnailUrl: videoData.thumbnailUrl || null,
+      dataAiHint: videoData.dataAiHint || null,
+      description: videoData.description || null,
+    };
+
+    const newVideo = await saveVideoToDb(dataToSave);
+    if (!newVideo) {
+      return { success: false, message: 'Failed to save video to the database.' };
+    }
+
+    revalidatePath('/dashboard/admin/manage-videos');
+    revalidatePath('/'); 
+    return { success: true, message: 'Video added successfully!', item: newVideo };
+  } catch (error) {
+    console.error('Error adding video:', error);
+    let errorMessage = 'An unexpected error occurred while adding the video.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function updateVideo(
+  id: string,
+  videoData: VideoFormData
+): Promise<ActionResult<AppVideo>> {
+  try {
+    const dataToUpdate: Partial<VideoCreationData> = {
+      ...videoData,
+      thumbnailUrl: videoData.thumbnailUrl || null,
+      dataAiHint: videoData.dataAiHint || null,
+      description: videoData.description || null,
+    };
+
+    const updatedVideo = await updateVideoInDb(id, dataToUpdate);
+    if (!updatedVideo) {
+      return { success: false, message: 'Failed to update video in the database.' };
+    }
+
+    revalidatePath('/dashboard/admin/manage-videos');
+    revalidatePath('/');
+    return { success: true, message: 'Video updated successfully!', item: updatedVideo };
+  } catch (error) {
+    console.error('Error updating video:', error);
+    let errorMessage = 'An unexpected error occurred while updating the video.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, message: errorMessage, errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+export async function deleteVideo(id: string): Promise<ActionResult> {
+  try {
+    const success = await deleteVideoFromDb(id);
+    if (!success) {
+      return { success: false, message: 'Failed to delete video from the database.' };
+    }
+
+    revalidatePath('/dashboard/admin/manage-videos');
+    revalidatePath('/');
+    return { success: true, message: 'Video deleted successfully!' };
+  } catch (error) {
+    console.error('Error deleting video:', error);
+    return { success: false, message: 'An unexpected error occurred while deleting the video.', errorDetails: error instanceof Error ? error.stack : undefined };
+  }
+}
+
+// --- Admin Dashboard Stats ---
+export async function fetchAdminDashboardStats() {
+  try {
+    const totalProjects = await prisma.project.count();
+    const totalUsers = await prisma.user.count();
+    const totalNewsArticles = await prisma.newsArticle.count();
+    const totalServices = await prisma.service.count();
+    const totalVideos = await prisma.video.count();
+    return { totalProjects, totalUsers, totalNewsArticles, totalServices, totalVideos };
+  } catch (error) {
+    console.error("Error fetching admin dashboard stats:", error);
+    throw new Error("Failed to load dashboard statistics.");
+  }
+}
+
+// --- Site Settings Actions ---
+interface SiteSettingsResult extends ActionResult {
+  settings?: SiteSettings | null;
+}
+
+export async function fetchSiteSettingsAction(): Promise<SiteSettings | null> {
+  try {
+    return await getSiteSettingsFromDb();
+  } catch (error) {
+    console.error("Error fetching site settings via action:", error);
+    return null; 
+  }
+}
+
+export async function updateSiteSettingsAction(
+  formData: SiteSettingsFormData
+): Promise<SiteSettingsResult> {
+  try {
+    const settingsToSave: Partial<SiteSettings> = {
+      siteName: formData.siteName,
+      maintenanceMode: formData.maintenanceMode,
+      contactEmail: formData.contactEmail,
+      footerMessage: formData.footerMessage,
+    };
+    const updatedSettings = await updateSiteSettingsInDb(settingsToSave);
+    if (!updatedSettings) {
+      return { success: false, message: 'Failed to save site settings to the database.' };
+    }
+    revalidatePath('/'); 
+    revalidatePath('/contact');
+    revalidatePath('/dashboard/admin/site-settings');
+
+    return { success: true, message: 'Site settings updated successfully!', settings: updatedSettings };
+  } catch (error) {
+    console.error('Error updating site settings via action:', error);
+    return { 
+      success: false, 
+      message: 'An unexpected error occurred while saving site settings.', 
+      errorDetails: error instanceof Error ? error.stack : undefined 
+    };
+  }
+}
+
+// --- User Creation Action for Credentials Signup ---
+interface CreateUserResult {
+  success: boolean;
+  message: string;
+  user?: AppUser | null; // Return the created user on success
+}
+
+export async function createUserAction(data: { name: string; email: string; password?: string }): Promise<CreateUserResult> {
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      return { success: false, message: "An account with this email already exists." };
+    }
+
+    let hashedPassword = null;
+    if (data.password) {
+      hashedPassword = await bcrypt.hash(data.password, 10);
+    } else {
+      // This case should ideally not be hit if using credentials provider which requires password
+      // but as a fallback if we allow creation without password for OAuth later.
+      // For pure credentials, password should always be present.
+      return { success: false, message: "Password is required for credentials signup." };
+    }
+
+    const newUser = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: hashedPassword, 
+        // role: 'user', // Default role, handled by Prisma schema default or can be set here
+        // emailVerified: null, // NextAuth typically handles this with VerificationToken for email provider
+      },
+    });
+
+    // Map Prisma user to AppUser for consistent return type
+    const appUser: AppUser = {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        emailVerified: newUser.emailVerified,
+        image: newUser.image,
+        role: newUser.role as AppUser['role'] | null,
+        created_at: newUser.created_at ? newUser.created_at.toISOString() : null,
+    };
+
+
+    return { success: true, message: "User created successfully.", user: appUser };
+  } catch (error) {
+    console.error("Error creating user:", error);
+    let errorMessage = "An unexpected error occurred during user creation.";
+    if (error instanceof Error) {
+        // Check for Prisma specific errors, e.g., unique constraint violation if not caught by email check
+        if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('email')) {
+             errorMessage = 'An account with this email already exists.';
+        } else {
+            errorMessage = error.message;
+        }
+    }
+    return { success: false, message: errorMessage };
+  }
+}

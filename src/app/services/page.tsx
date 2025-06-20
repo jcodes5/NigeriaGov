@@ -1,11 +1,13 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getAllServices } from "@/lib/data";
 import { ServiceCard } from "@/components/services/service-card";
 import { Server } from "lucide-react";
+import type { ServiceItem } from "@/types";
 
-export default function ServicesPage() {
-  const allServices = getAllServices();
+// This page is now a Server Component, fetching data directly
+export default async function ServicesPage() {
+  const allServices: ServiceItem[] = await getAllServices();
 
   return (
     <div className="space-y-8 py-8">

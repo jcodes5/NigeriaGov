@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { syncUserProfile } from '@/lib/actions'; // Import the server action
+import { createUserAction } from '@/lib/actions';
+import { signIn } from 'next-auth/react';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -28,6 +28,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 export function SignupForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
@@ -36,63 +37,42 @@ export function SignupForm() {
 
   const onSubmit: SubmitHandler<SignupFormData> = async (formData) => {
     setIsLoading(true);
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    
+    const result = await createUserAction({
+      name: formData.name,
       email: formData.email,
       password: formData.password,
-      options: {
-        // You can add user_metadata here if needed by Supabase Auth itself
-        // For our public 'users' table, we'll use a separate server action
-      }
     });
 
-    if (authError) {
+    if (result.success && result.user) {
       toast({
-        title: "Signup Failed",
-        description: authError.message || "Could not create your account.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    if (authData.user) {
-      // User created in Supabase Auth, now create profile in public users table
-      const { error: profileError } = await syncUserProfile({
-        userId: authData.user.id,
-        email: formData.email, // Use email from form as Supabase might not return it immediately if email confirmation is pending
-        name: formData.name,
+        title: "Account Created",
+        description: "Your account has been successfully created. Logging you in...",
       });
 
-      if (profileError) {
+      // Automatically sign in the user
+      const signInResult = await signIn('credentials', {
+        redirect: false, // Handle redirect manually
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (signInResult?.error) {
         toast({
-          title: "Profile Creation Failed",
-          description: profileError || "Your account was created, but we couldn't set up your profile. Please contact support.",
+          title: "Login Failed After Signup",
+          description: signInResult.error || "Could not log you in automatically. Please try logging in manually.",
           variant: "destructive",
         });
-        // Potentially, you might want to clean up the Supabase auth user here if profile creation is critical
-      } else {
-         if (authData.session) {
-          // User is logged in (e.g. autoVerifyEmail is on, or no email verification required)
-          toast({
-            title: "Account Created",
-            description: "You have successfully signed up and are logged in!",
-          });
-          router.push('/dashboard/user');
-          router.refresh();
-        } else {
-          // Email confirmation required
-          toast({
-            title: "Account Created",
-            description: "Please check your email to verify your account before logging in.",
-          });
-          router.push('/login'); // Redirect to login page
-        }
+        router.push('/login'); // Redirect to login if auto-login fails
+      } else if (signInResult?.ok) {
+        const redirectUrl = searchParams.get('redirect') || '/dashboard/user';
+        router.push(redirectUrl);
+        router.refresh(); 
       }
     } else {
-      // Should not happen if authError is null, but as a safeguard
       toast({
-        title: "Signup Issue",
-        description: "An unexpected issue occurred during signup. Please try again.",
+        title: "Signup Failed",
+        description: result.message || "Could not create your account. Please try again.",
         variant: "destructive",
       });
     }

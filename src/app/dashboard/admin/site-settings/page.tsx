@@ -12,35 +12,38 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useEffect } from "react"; // Removed useState as it's not used for settings state
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchSiteSettingsAction, updateSiteSettingsAction } from "@/lib/actions";
+import type { SiteSettings } from "@/types"; // Assuming SiteSettings type is defined
+import { Loader2 } from "lucide-react";
 
 const settingsSchema = z.object({
-  siteName: z.string().min(3, "Site name must be at least 3 characters."),
+  siteName: z.string().min(3, "Site name must be at least 3 characters.").max(100).optional().nullable(),
   maintenanceMode: z.boolean(),
-  contactEmail: z.string().email("Invalid contact email."),
-  footerMessage: z.string().max(200, "Footer message too long.").optional(),
+  contactEmail: z.string().email("Invalid contact email.").optional().nullable(),
+  footerMessage: z.string().max(300, "Footer message too long.").optional().nullable(),
 });
 
-type SettingsFormData = z.infer<typeof settingsSchema>;
+export type SiteSettingsFormData = z.infer<typeof settingsSchema>;
 
-// Mock current settings - in a real app, these would be fetched from a DB or config
-const currentSettings: SettingsFormData = {
+const defaultSettings: SiteSettingsFormData = {
   siteName: "NigeriaGovHub",
   maintenanceMode: false,
   contactEmail: "info@nigeriagovhub.gov.ng",
   footerMessage: `© ${new Date().getFullYear()} NigeriaGovHub. All rights reserved.`,
 };
 
-
 export default function SiteSettingsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth(); // Use profile from AuthContext
+  const { isAdmin, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  
-  const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<SettingsFormData>({
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [initialSettings, setInitialSettings] = useState<SiteSettingsFormData>(defaultSettings);
+
+  const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<SiteSettingsFormData>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: currentSettings, 
+    defaultValues: initialSettings, 
   });
   
   useEffect(() => {
@@ -49,35 +52,70 @@ export default function SiteSettingsPage() {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
-        // If fetching real settings, you would do:
-        // const fetchedSettings = await getSiteSettings(); // (imaginary function)
-        // reset(fetchedSettings); 
-        reset(currentSettings); // For now, reset with mock data
+        const loadSettings = async () => {
+          setIsLoadingSettings(true);
+          try {
+            const fetchedSettings = await fetchSiteSettingsAction();
+            const formValues = {
+              siteName: fetchedSettings?.siteName ?? defaultSettings.siteName,
+              maintenanceMode: fetchedSettings?.maintenanceMode ?? defaultSettings.maintenanceMode,
+              contactEmail: fetchedSettings?.contactEmail ?? defaultSettings.contactEmail,
+              footerMessage: fetchedSettings?.footerMessage ?? defaultSettings.footerMessage,
+            };
+            setInitialSettings(formValues);
+            reset(formValues);
+          } catch (error) {
+            console.error("Failed to fetch site settings:", error);
+            toast({ title: "Error", description: "Could not load site settings. Using defaults.", variant: "destructive" });
+            setInitialSettings(defaultSettings);
+            reset(defaultSettings);
+          } finally {
+            setIsLoadingSettings(false);
+          }
+        };
+        loadSettings();
       }
     }
   }, [isAdmin, authLoading, router, toast, reset]);
 
 
-  const onSubmit: SubmitHandler<SettingsFormData> = async (data) => {
-    // In a real app, save settings to DB via a server action
-    // await saveSiteSettings(data);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    console.log("Settings saved (simulated):", data);
-    Object.assign(currentSettings, data); // Update mock currentSettings in memory
-    toast({
-      title: "Settings Saved (Simulated)",
-      description: "Site settings have been successfully updated.",
-    });
+  const onSubmit: SubmitHandler<SiteSettingsFormData> = async (data) => {
+    const result = await updateSiteSettingsAction(data);
+    if (result.success) {
+      toast({
+        title: "Settings Saved",
+        description: "Site settings have been successfully updated.",
+      });
+      const updatedFormValues = {
+        siteName: result.settings?.siteName ?? data.siteName ?? defaultSettings.siteName,
+        maintenanceMode: result.settings?.maintenanceMode ?? data.maintenanceMode ?? defaultSettings.maintenanceMode,
+        contactEmail: result.settings?.contactEmail ?? data.contactEmail ?? defaultSettings.contactEmail,
+        footerMessage: result.settings?.footerMessage ?? data.footerMessage ?? defaultSettings.footerMessage,
+      };
+      setInitialSettings(updatedFormValues); // Update initialSettings to reflect saved state
+      reset(updatedFormValues); // Reset form with newly saved (and potentially defaulted by server) values
+    } else {
+      toast({
+        title: "Error Saving Settings",
+        description: result.message || "An unknown error occurred.",
+        variant: "destructive",
+      });
+    }
   };
   
-  if (authLoading || !isAdmin) { // Covers initial loading and access denial after loading
+  if (authLoading || (isAdmin && isLoadingSettings)) {
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">Verifying admin access and loading settings...</p>
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">
+          {authLoading ? "Verifying admin access..." : "Loading site settings..."}
+        </p>
       </div>
     );
   }
+
+  if (!isAdmin && !authLoading) return null;
+
 
   return (
     <div className="space-y-8">
@@ -137,14 +175,16 @@ export default function SiteSettingsPage() {
         </Card>
         
         <div className="mt-8 flex flex-col sm:flex-row sm:justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => reset(currentSettings)} disabled={isSubmitting} className="w-full sm:w-auto">
-                Reset to Defaults
+            <Button type="button" variant="outline" onClick={() => reset(initialSettings)} disabled={isSubmitting} className="w-full sm:w-auto">
+                Reset Changes
             </Button>
             <Button type="submit" className="button-hover w-full sm:w-auto" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Settings (Simulated)"}
+                {isSubmitting ? "Saving..." : "Save Settings"}
             </Button>
         </div>
       </form>
     </div>
   );
 }
+
+    
