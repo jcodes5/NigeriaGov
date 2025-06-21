@@ -22,7 +22,7 @@ export default function SignupPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SignupForm />
+            <SignupForm dictionary={{}} />
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Already have an account?{' '}
               <Button variant="link" asChild className="p-0 font-medium text-primary hover:text-primary/80">
