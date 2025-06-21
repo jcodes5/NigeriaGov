@@ -8,7 +8,7 @@ import { LanguageProvider } from '@/context/language-context';
 import { CustomSessionProvider } from '@/components/providers/session-provider'; // ✅ Use your wrapper
 
 export const metadata: Metadata = {
-  title: 'NigeriaGovHub  Connecting Nigerians to Gov Services',
+  title: 'NigeriaGovHub - connecting Nigerians with Government Services',
   description: 'Discover government projects and initiatives across Nigeria.',
 };
 
