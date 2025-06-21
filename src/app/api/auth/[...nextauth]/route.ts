@@ -88,6 +88,7 @@ const providers = [
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: providers,
+  secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: 'jwt',
   },
