@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Globe } from 'lucide-react';
@@ -8,46 +9,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useState, useEffect } from 'react';
+import { useLanguage } from '@/context/language-context';
 
 export function LanguageToggle() {
-  const [currentLanguage, setCurrentLanguage] = useState("EN");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    // Here you would typically load the saved language preference
-    // For now, defaulting to EN
-  }, []);
-
-  if (!mounted) {
-    return <Button variant="ghost" size="icon" className="w-9 h-9 opacity-0" aria-label="Loading language options"><Globe className="h-5 w-5" /></Button>;
-  }
-
-  const handleLanguageChange = (lang: string) => {
-    setCurrentLanguage(lang);
-    // Here you would implement logic to change the application's language
-    console.log(`Language changed to: ${lang}`);
-  };
+  const { setLocale } = useLanguage();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="w-9 h-9" aria-label={`Current language: ${currentLanguage}, Change language`}>
+        <Button variant="ghost" size="icon" className="w-9 h-9" aria-label="Change language">
           <Globe className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleLanguageChange("EN")}>
+        <DropdownMenuItem onClick={() => setLocale('en')}>
           English (EN)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleLanguageChange("HA")}>
+        <DropdownMenuItem onClick={() => setLocale('ha')}>
           Hausa (HA)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleLanguageChange("IG")}>
+        <DropdownMenuItem onClick={() => setLocale('ig')}>
           Igbo (IG)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleLanguageChange("YO")}>
+        <DropdownMenuItem onClick={() => setLocale('yo')}>
           Yoruba (YO)
         </DropdownMenuItem>
       </DropdownMenuContent>

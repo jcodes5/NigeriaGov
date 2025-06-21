@@ -1,26 +1,27 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { Project } from '@/types';
 import { ministries, states } from '@/lib/data'; // ministries and states still from mock
 import { ProjectCard } from '@/components/projects/project-card';
 import { FilterControls } from '@/components/projects/filter-controls';
 import { Pagination } from '@/components/common/pagination';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton'; 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { fetchAllProjectsAction } from '@/lib/actions'; // Import the server action
 
 const ITEMS_PER_PAGE = 9;
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilters, setActiveFilters] = useState<{ ministryId?: string; stateId?: string; date?: Date, status?: string }>({});
+  const [activeFilters, setActiveFilters] = useState<{ ministryId?: string; stateId?: string; date?: Date; status?: string; search?: string }>({ search: initialSearch });
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -30,17 +31,25 @@ export default function ProjectsPage() {
         setAllProjects(projectsData);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
-        setAllProjects([]); 
+        setAllProjects([]);
       } finally {
         setIsLoading(false);
       }
     };
     fetchProjects();
   }, []);
-  
+
   const projectsToDisplay = useMemo(() => {
     let projects = allProjects;
+    const searchTerm = (activeFilters.search || "").toLowerCase();
 
+    if (searchTerm) {
+      projects = projects.filter(p =>
+        p.title.toLowerCase().includes(searchTerm) ||
+        p.subtitle.toLowerCase().includes(searchTerm) ||
+        p.description.toLowerCase().includes(searchTerm)
+      );
+    }
     if (activeFilters.ministryId) {
       projects = projects.filter(p => p.ministry.id === activeFilters.ministryId);
     }
@@ -58,29 +67,19 @@ export default function ProjectsPage() {
         return selectedDate >= startDate && selectedDate <= endDate;
       });
     }
-    
-    if (searchTerm) {
-      projects = projects.filter(p =>
-        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.subtitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.ministry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.state.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.tags && p.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
-      );
-    }
+
     return projects;
-  }, [allProjects, searchTerm, activeFilters]);
+  }, [allProjects, activeFilters]);
 
 
-  const applyFilters = (newFilters: { ministryId?: string; stateId?: string; date?: Date, status?: string }) => {
+  const applyFilters = (newFilters: { ministryId?: string; stateId?: string; date?: Date; status?: string; search?: string }) => {
     setCurrentPage(1);
     setActiveFilters(newFilters);
   };
-  
+
   const clearFilters = () => {
     setCurrentPage(1);
     setActiveFilters({});
-    setSearchTerm('');
   }
 
   const paginatedProjects = useMemo(() => {
@@ -100,25 +99,12 @@ export default function ProjectsPage() {
         </p>
       </section>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Search projects by keyword, ministry, state, tag..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1); 
-          }}
-          className="pl-10 pr-4 py-2 w-full"
-        />
-      </div>
-      
-      <FilterControls 
-        ministries={ministries} 
-        states={states} 
+      <FilterControls
+        ministries={ministries}
+        states={states}
         onFilterChange={applyFilters}
         onClearFilters={clearFilters}
+        initialSearch={initialSearch}
       />
 
       {isLoading ? (
@@ -160,4 +146,12 @@ export default function ProjectsPage() {
       )}
     </div>
   );
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProjectsPageContent />
+    </Suspense>
+  )
 }

@@ -12,18 +12,20 @@ import { useToast } from "@/hooks/use-toast";
 import { addService, updateService } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { serviceFormSchemaRaw, type ServiceItem, type ServiceFormData } from "@/types";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import { Card, CardDescription } from "@/components/ui/card";
 
 const serviceSchema = z.object({
-  title: serviceFormSchemaRaw.title(z),
-  slug: serviceFormSchemaRaw.slug(z),
-  summary: serviceFormSchemaRaw.summary(z),
-  category: serviceFormSchemaRaw.category(z),
-  link: serviceFormSchemaRaw.link(z).nullable(),
-  imageUrl: serviceFormSchemaRaw.imageUrl(z).nullable(),
-  dataAiHint: serviceFormSchemaRaw.dataAiHint(z).nullable(),
-  iconName: serviceFormSchemaRaw.iconName(z).nullable(),
-});
+  title: serviceFormSchemaRaw.title(z).required(),
+  slug: serviceFormSchemaRaw.slug(z).required(),
+  summary: serviceFormSchemaRaw.summary(z).required(),
+  category: serviceFormSchemaRaw.category(z).required(),
+  link: serviceFormSchemaRaw.link(z).nullable().optional(),
+  imageUrl: serviceFormSchemaRaw.imageUrl(z).nullable().optional(),
+  dataAiHint: serviceFormSchemaRaw.dataAiHint(z).nullable().optional(),
+  iconName: serviceFormSchemaRaw.iconName(z).nullable().optional(),
+}) as z.ZodType<ServiceFormData>;
 
 interface ServiceFormProps {
   initialData?: ServiceItem;
@@ -35,15 +37,16 @@ export function ServiceForm({ initialData, serviceId, onSuccess }: ServiceFormPr
   const { toast } = useToast();
   const router = useRouter();
   const isEditMode = !!serviceId;
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ServiceFormData>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue } = useForm<ServiceFormData>({
     resolver: zodResolver(serviceSchema),
     defaultValues: initialData ? {
       ...initialData,
       link: initialData.link || "",
       imageUrl: initialData.imageUrl || "",
       dataAiHint: initialData.dataAiHint || "",
-      iconName: initialData.iconName || "",
+      iconName: initialData.iconName || undefined,
     } : {
       title: "",
       slug: "",
@@ -52,7 +55,7 @@ export function ServiceForm({ initialData, serviceId, onSuccess }: ServiceFormPr
       link: "",
       imageUrl: "",
       dataAiHint: "",
-      iconName: "",
+      iconName: undefined,
     },
   });
 
@@ -63,10 +66,26 @@ export function ServiceForm({ initialData, serviceId, onSuccess }: ServiceFormPr
         link: initialData.link || "",
         imageUrl: initialData.imageUrl || "",
         dataAiHint: initialData.dataAiHint || "",
-        iconName: initialData.iconName || "",
+        iconName: initialData.iconName || undefined,
       });
+      setImagePreview(initialData.imageUrl || null);
     }
   }, [initialData, reset]);
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setValue('imageUrl', '');
+    } else {
+      setImagePreview(initialData?.imageUrl || null);
+      setValue('imageUrl', initialData?.imageUrl || '');
+    }
+  };
 
   const onSubmit: SubmitHandler<ServiceFormData> = async (data) => {
     const dataToSubmit = {
@@ -89,7 +108,10 @@ export function ServiceForm({ initialData, serviceId, onSuccess }: ServiceFormPr
         title: isEditMode ? "Service Updated!" : "Service Added!",
         description: result.message,
       });
-      if (!isEditMode) reset();
+      if (!isEditMode) {
+        reset();
+        setImagePreview(null);
+      }
       if (onSuccess) onSuccess();
       router.push("/dashboard/admin/manage-services");
       router.refresh();
@@ -118,7 +140,7 @@ export function ServiceForm({ initialData, serviceId, onSuccess }: ServiceFormPr
           {isEditMode && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
         </div>
       </div>
-      
+
       <div>
         <Label htmlFor="summary">Summary</Label>
         <Textarea id="summary" {...register("summary")} rows={3} className="mt-1" />
@@ -144,9 +166,23 @@ export function ServiceForm({ initialData, serviceId, onSuccess }: ServiceFormPr
         {errors.link && <p className="text-sm text-destructive mt-1">{errors.link.message}</p>}
       </div>
 
+      <Card className="p-4 space-y-3 bg-muted/30">
+        <Label htmlFor="imageFile">Service Image (Optional)</Label>
+        <Input id="imageFile" type="file" accept="image/*" onChange={handleImageFileChange} className="mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
+        {imagePreview && (
+          <div className="mt-2">
+            <Label>Image Preview:</Label>
+            <Image src={imagePreview} alt="Preview" width={200} height={120} className="mt-1 rounded-md border object-cover aspect-video" />
+          </div>
+        )}
+        <CardDescription className="text-xs">
+          Select an image to preview. Then, upload it to your storage and paste the URL into the 'Image URL' field below.
+        </CardDescription>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label htmlFor="imageUrl">Image URL (Optional)</Label>
+          <Label htmlFor="imageUrl">Image URL (Optional, paste after uploading)</Label>
           <Input id="imageUrl" {...register("imageUrl")} className="mt-1" placeholder="https://example.com/image.png" />
           {errors.imageUrl && <p className="text-sm text-destructive mt-1">{errors.imageUrl.message}</p>}
         </div>

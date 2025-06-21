@@ -25,19 +25,20 @@ const signupSchema = z.object({
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
-export function SignupForm() {
+export function SignupForm({ dictionary }: { dictionary: any }) {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
   });
 
   const onSubmit: SubmitHandler<SignupFormData> = async (formData) => {
-    setIsLoading(true);
-    
+    setIsLoadingCredentials(true);
+
     const result = await createUserAction({
       name: formData.name,
       email: formData.email,
@@ -50,9 +51,8 @@ export function SignupForm() {
         description: "Your account has been successfully created. Logging you in...",
       });
 
-      // Automatically sign in the user
       const signInResult = await signIn('credentials', {
-        redirect: false, // Handle redirect manually
+        redirect: false,
         email: formData.email,
         password: formData.password,
       });
@@ -63,11 +63,11 @@ export function SignupForm() {
           description: signInResult.error || "Could not log you in automatically. Please try logging in manually.",
           variant: "destructive",
         });
-        router.push('/login'); // Redirect to login if auto-login fails
+        router.push('/login');
       } else if (signInResult?.ok) {
         const redirectUrl = searchParams.get('redirect') || '/dashboard/user';
         router.push(redirectUrl);
-        router.refresh(); 
+        router.refresh();
       }
     } else {
       toast({
@@ -76,64 +76,101 @@ export function SignupForm() {
         variant: "destructive",
       });
     }
-    setIsLoading(false);
+    setIsLoadingCredentials(false);
   };
 
+  const handleGoogleSignUp = async () => {
+    setIsLoadingGoogle(true);
+    const redirectUrl = searchParams.get('redirect') || '/dashboard/user';
+    await signIn('google', { callbackUrl: redirectUrl });
+  };
+
+  const overallLoading = isLoadingCredentials || isLoadingGoogle;
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
-        <Label htmlFor="name">Full Name</Label>
-        <Input
-          id="name"
-          {...register("name")}
-          className="mt-1"
-          aria-invalid={errors.name ? "true" : "false"}
-        />
-        {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="email">Email Address</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          {...register("email")}
-          className="mt-1"
-          aria-invalid={errors.email ? "true" : "false"}
-        />
-        {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          {...register("password")}
-          className="mt-1"
-          aria-invalid={errors.password ? "true" : "false"}
-        />
-        {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input
-          id="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          {...register("confirmPassword")}
-          className="mt-1"
-          aria-invalid={errors.confirmPassword ? "true" : "false"}
-        />
-        {errors.confirmPassword && <p className="text-sm text-destructive mt-1">{errors.confirmPassword.message}</p>}
-      </div>
-
-      <Button type="submit" className="w-full button-hover" disabled={isLoading}>
-        {isLoading ? 'Creating Account...' : 'Sign Up'}
+    <div className="space-y-6">
+      <Button
+        variant="outline"
+        className="w-full button-hover"
+        onClick={handleGoogleSignUp}
+        disabled={overallLoading}
+      >
+        {isLoadingGoogle ? 'Processing...' : (
+          <>
+            <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+              <path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.3 512 0 398.5 0 256S110.3 0 244 0c69.8 0 130.8 28.4 175.2 72.9L358.3 167.1C329.3 139.2 290.5 121.4 244 121.4c-73.3 0-133.5 58.4-133.5 130.6s60.2 130.6 133.5 130.6c76.8 0 114.1-51.7 117.8-76.3H244V261.8h244z"></path>
+            </svg>
+            {dictionary.google_signup}
+          </>
+        )}
       </Button>
-    </form>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-2 text-muted-foreground">
+            {dictionary.or_continue_with}
+          </span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div>
+          <Label htmlFor="name">{dictionary.name_label}</Label>
+          <Input
+            id="name"
+            {...register("name")}
+            className="mt-1"
+            aria-invalid={errors.name ? "true" : "false"}
+          />
+          {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="email">{dictionary.email_label}</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            {...register("email")}
+            className="mt-1"
+            aria-invalid={errors.email ? "true" : "false"}
+          />
+          {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="password">{dictionary.password_label}</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            {...register("password")}
+            className="mt-1"
+            aria-invalid={errors.password ? "true" : "false"}
+          />
+          {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="confirmPassword">{dictionary.confirm_password_label}</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            {...register("confirmPassword")}
+            className="mt-1"
+            aria-invalid={errors.confirmPassword ? "true" : "false"}
+          />
+          {errors.confirmPassword && <p className="text-sm text-destructive mt-1">{errors.confirmPassword.message}</p>}
+        </div>
+
+        <Button type="submit" className="w-full button-hover" disabled={overallLoading}>
+          {isLoadingCredentials ? dictionary.creating_account : dictionary.signup_button}
+        </Button>
+      </form>
+    </div>
   );
 }

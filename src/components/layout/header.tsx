@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from '@/context/language-context';
 
 const NavLink = ({ href, children, className }: { href: string; children: React.ReactNode, className?: string }) => {
   const pathname = usePathname();
@@ -64,51 +65,49 @@ const NavDropdown = ({ label, icon: Icon, items }: { label: string; icon?: React
   );
 };
 
-
 export function Header() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const t = dictionary.header;
   const user = session?.user;
   const isLoading = status === "loading";
 
-
   const handleLogout = () => {
-    signOut({ callbackUrl: '/' });
+    const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : '/';
+    signOut({ callbackUrl });
   };
 
   const publicServicesItems = [
-    { href: "/benefits", label: "Benefits", icon: Landmark },
-    { href: "/health", label: "Health", icon: Heart },
-    { href: "/taxes", label: "Taxes", icon: Scale },
-    { href: "/business", label: "Business & Industry", icon: Briefcase },
+    { href: "/benefits", label: t.benefits, icon: Landmark },
+    { href: "/health", label: t.health, icon: Heart },
+    { href: "/taxes", label: t.taxes, icon: Scale },
+    { href: "/business", label: t.business, icon: Briefcase },
   ];
 
   const exploreNigeriaItems = [
-    { href: "/culture", label: "Culture & History", icon: Palette },
-    { href: "/tourism", label: "Travel & Tourism", icon: Globe },
-    { href: "/sports", label: "Sports", icon: Bike }, 
-  ];
-  
-  const governmentCitizenshipItems = [
-    { href: "/immigration", label: "Immigration & Citizenship", icon: Users },
+    { href: "/culture", label: t.culture, icon: Palette },
+    { href: "/tourism", label: t.tourism, icon: Globe },
+    { href: "/sports", label: t.sports, icon: Bike },
   ];
 
+  const governmentCitizenshipItems = [
+    { href: "/immigration", label: t.immigration, icon: Users },
+  ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Logo />
         <nav className="hidden lg:flex items-center space-x-1">
-          <NavLink href="/" className="px-2">Home</NavLink>
-          <NavLink href="/projects" className="px-2">Projects</NavLink>
-          <NavLink href="/news" className="px-2">News</NavLink>
-          <NavLink href="/services" className="px-2">Services</NavLink>
-          
-          <NavDropdown label="Public Services" items={publicServicesItems} />
-          <NavDropdown label="Explore Nigeria" items={exploreNigeriaItems} />
-          <NavDropdown label="Govt. & Citizenship" items={governmentCitizenshipItems} />
-          <NavLink href="/site-feedback" className="px-2">Feedback</NavLink>
-
+          <NavLink href="/" className="px-2">{t.home}</NavLink>
+          <NavLink href="/projects" className="px-2">{t.projects}</NavLink>
+          <NavLink href="/news" className="px-2">{t.news}</NavLink>
+          <NavLink href="/services" className="px-2">{t.services}</NavLink>
+          <NavDropdown label={t.public_services} items={publicServicesItems} />
+          <NavDropdown label={t.explore_nigeria} items={exploreNigeriaItems} />
+          <NavDropdown label={t.govt_citizenship} items={governmentCitizenshipItems} />
+          <NavLink href="/site-feedback" className="px-2">{t.feedback}</NavLink>
         </nav>
         <div className="flex items-center space-x-2">
           <LanguageToggle />
@@ -117,26 +116,26 @@ export function Header() {
           ) : user ? (
             <>
               <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/user')} className="button-hover hidden sm:inline-flex">
-                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+                <LayoutDashboard className="mr-2 h-4 w-4" /> {t.dashboard}
               </Button>
               <Button variant="ghost" size="sm" onClick={handleLogout} className="button-hover hidden sm:inline-flex">
-                <LogOut className="mr-2 h-4 w-4" /> Logout
+                <LogOut className="mr-2 h-4 w-4" /> {t.logout}
               </Button>
                <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/user')} className="button-hover sm:hidden">
                 <LayoutDashboard className="h-5 w-5" />
-                 <span className="sr-only">Dashboard</span>
+                 <span className="sr-only">{t.dashboard}</span>
               </Button>
             </>
           ) : (
             <>
               <Button variant="ghost" size="sm" asChild className="button-hover hidden sm:inline-flex">
-                <Link href="/login"><LogIn className="mr-2 h-4 w-4" />Login</Link>
+                <Link href="/login"><LogIn className="mr-2 h-4 w-4" />{t.login}</Link>
               </Button>
               <Button variant="default" size="sm" asChild className="button-hover hidden sm:inline-flex">
-                <Link href="/signup"><UserPlus className="mr-2 h-4 w-4" />Sign Up</Link>
+                <Link href="/signup"><UserPlus className="mr-2 h-4 w-4" />{t.signup}</Link>
               </Button>
                <Button variant="ghost" size="icon" asChild className="button-hover sm:hidden">
-                <Link href="/login"><LogIn className="h-5 w-5" /><span className="sr-only">Login</span></Link>
+                <Link href="/login"><LogIn className="h-5 w-5" /><span className="sr-only">{t.login}</span></Link>
               </Button>
             </>
           )}
@@ -149,23 +148,25 @@ export function Header() {
   );
 }
 
-
 const MobileNav = () => {
- const publicServicesItems = [
-    { href: "/benefits", label: "Benefits", icon: Landmark },
-    { href: "/health", label: "Health", icon: Heart },
-    { href: "/taxes", label: "Taxes", icon: Scale },
-    { href: "/business", label: "Business & Industry", icon: Briefcase },
+  const { dictionary } = useLanguage();
+  const t = dictionary.header;
+
+  const publicServicesItems = [
+    { href: "/benefits", label: t.benefits, icon: Landmark },
+    { href: "/health", label: t.health, icon: Heart },
+    { href: "/taxes", label: t.taxes, icon: Scale },
+    { href: "/business", label: t.business, icon: Briefcase },
   ];
 
   const exploreNigeriaItems = [
-    { href: "/culture", label: "Culture & History", icon: Palette },
-    { href: "/tourism", label: "Travel & Tourism", icon: Globe },
-    { href: "/sports", label: "Sports", icon: Bike },
+    { href: "/culture", label: t.culture, icon: Palette },
+    { href: "/tourism", label: t.tourism, icon: Globe },
+    { href: "/sports", label: t.sports, icon: Bike },
   ];
-  
+
   const governmentCitizenshipItems = [
-    { href: "/immigration", label: "Immigration & Citizenship", icon: Users },
+    { href: "/immigration", label: t.immigration, icon: Users },
   ];
 
   return (
@@ -173,40 +174,40 @@ const MobileNav = () => {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon">
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">{t.toggle_menu}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem asChild><NavLink href="/" className="w-full">Home</NavLink></DropdownMenuItem>
-        <DropdownMenuItem asChild><NavLink href="/projects" className="w-full">Projects</NavLink></DropdownMenuItem>
-        <DropdownMenuItem asChild><NavLink href="/news" className="w-full">News</NavLink></DropdownMenuItem>
-        <DropdownMenuItem asChild><NavLink href="/services" className="w-full">Services</NavLink></DropdownMenuItem>
-        
+        <DropdownMenuItem asChild><NavLink href="/" className="w-full">{t.home}</NavLink></DropdownMenuItem>
+        <DropdownMenuItem asChild><NavLink href="/projects" className="w-full">{t.projects}</NavLink></DropdownMenuItem>
+        <DropdownMenuItem asChild><NavLink href="/news" className="w-full">{t.news}</NavLink></DropdownMenuItem>
+        <DropdownMenuItem asChild><NavLink href="/services" className="w-full">{t.services}</NavLink></DropdownMenuItem>
+
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Public Services</DropdownMenuLabel>
+        <DropdownMenuLabel>{t.public_services}</DropdownMenuLabel>
         {publicServicesItems.map(item => (
           <DropdownMenuItem key={item.href} asChild>
             <NavLink href={item.href} className="w-full">{item.icon && <item.icon className="mr-2 h-4 w-4" />}{item.label}</NavLink>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Explore Nigeria</DropdownMenuLabel>
+        <DropdownMenuLabel>{t.explore_nigeria}</DropdownMenuLabel>
          {exploreNigeriaItems.map(item => (
           <DropdownMenuItem key={item.href} asChild>
             <NavLink href={item.href} className="w-full">{item.icon && <item.icon className="mr-2 h-4 w-4" />}{item.label}</NavLink>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Govt. & Citizenship</DropdownMenuLabel>
+        <DropdownMenuLabel>{t.govt_citizenship}</DropdownMenuLabel>
         {governmentCitizenshipItems.map(item => (
           <DropdownMenuItem key={item.href} asChild>
             <NavLink href={item.href} className="w-full">{item.icon && <item.icon className="mr-2 h-4 w-4" />}{item.label}</NavLink>
           </DropdownMenuItem>
         ))}
          <DropdownMenuSeparator />
-        <DropdownMenuItem asChild><NavLink href="/site-feedback" className="w-full"><MessageSquare className="mr-2 h-4 w-4" />Site Feedback</NavLink></DropdownMenuItem>
-        <DropdownMenuItem asChild><NavLink href="/about" className="w-full">About</NavLink></DropdownMenuItem>
-        <DropdownMenuItem asChild><NavLink href="/contact" className="w-full">Contact</NavLink></DropdownMenuItem>
+        <DropdownMenuItem asChild><NavLink href="/site-feedback" className="w-full"><MessageSquare className="mr-2 h-4 w-4" />{t.site_feedback}</NavLink></DropdownMenuItem>
+        <DropdownMenuItem asChild><NavLink href="/about" className="w-full">{t.about}</NavLink></DropdownMenuItem>
+        <DropdownMenuItem asChild><NavLink href="/contact" className="w-full">{t.contact}</NavLink></DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

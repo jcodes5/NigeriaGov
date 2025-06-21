@@ -14,11 +14,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addProject, updateProject } from "@/lib/actions";
-import { ministries, states } from "@/lib/data"; 
+import { ministries, states } from "@/lib/data";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { projectFormSchemaRaw, type Project, type ProjectFormData } from "@/types"; 
+import { projectFormSchemaRaw, type Project, type ProjectFormData } from "@/types";
 import { useEffect } from "react";
 
 const projectSchema = z.object({
@@ -37,8 +37,8 @@ const projectSchema = z.object({
 
 
 interface ProjectFormProps {
-  initialData?: Project; 
-  projectId?: string; 
+  initialData?: Project;
+  projectId?: string;
   onSuccess?: () => void;
 }
 
@@ -48,7 +48,7 @@ export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormPr
   const isEditMode = !!projectId;
 
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ProjectFormData>({
-    resolver: zodResolver(projectSchema),
+    resolver: zodResolver(projectSchema as z.Schema<ProjectFormData>),
     defaultValues: initialData ? {
       ...initialData,
       ministryId: initialData.ministry_id || "", // Map from AppProject to ProjectFormData
@@ -64,7 +64,7 @@ export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormPr
       ministryId: "",
       stateId: "",
       status: "Planned",
-      startDate: new Date(), 
+      startDate: new Date(),
       expectedEndDate: null,
       description: "",
       budget: undefined,
@@ -72,7 +72,7 @@ export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormPr
       tags: "",
     },
   });
-  
+
   useEffect(() => {
     if (initialData) {
       reset({
@@ -108,9 +108,9 @@ export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormPr
         title: isEditMode ? "Project Updated!" : "Project Added!",
         description: result.message,
       });
-      if (!isEditMode) reset(); 
+      if (!isEditMode) reset();
       if (onSuccess) onSuccess();
-      router.push("/dashboard/admin/manage-projects"); 
+      router.push("/dashboard/admin/manage-projects");
       router.refresh();
     } else {
       toast({
@@ -244,7 +244,7 @@ export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormPr
           {errors.expectedEndDate && <p className="text-sm text-destructive mt-1">{errors.expectedEndDate.message}</p>}
         </div>
       </div>
-      
+
       <div>
         <Label htmlFor="description">Project Description</Label>
         <Textarea id="description" {...register("description")} rows={5} className="mt-1" />
@@ -263,7 +263,7 @@ export function ProjectForm({ initialData, projectId, onSuccess }: ProjectFormPr
           {errors.expenditure && <p className="text-sm text-destructive mt-1">{errors.expenditure.message}</p>}
         </div>
       </div>
-      
+
       <div>
         <Label htmlFor="tags">Tags (Comma-separated, Optional)</Label>
         <Input id="tags" {...register("tags")} className="mt-1" placeholder="e.g., infrastructure, education, health" />

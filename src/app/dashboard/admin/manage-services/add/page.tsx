@@ -3,31 +3,40 @@
 
 import { ServiceForm } from "@/components/admin/service-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 export default function AddServicePage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-      router.replace("/dashboard/user");
-    }
-  }, [isAdmin, authLoading, router, toast]);
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
 
-  if (authLoading || !isAdmin) {
+  useEffect(() => {
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+      } else if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+      }
+    }
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, pathname]);
+
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin)) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-3 text-lg">Verifying admin access...</p>
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">Verifying access...</p>
       </div>
     );
   }

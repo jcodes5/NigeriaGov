@@ -3,9 +3,9 @@
 
 import { VideoForm } from "@/components/admin/video-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,45 +15,56 @@ import type { Video } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EditVideoPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const videoId = params.id as string;
   const { toast } = useToast();
   const [video, setVideo] = useState<Video | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-      router.replace("/dashboard/user");
-      return;
-    }
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+        return;
+      }
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+        return;
+      }
 
-    if (isAdmin && videoId) {
-      setIsLoadingData(true);
-      getVideoById(videoId)
-        .then(data => {
-          if (data) {
-            setVideo(data);
-          } else {
-            toast({ title: "Error", description: "Video not found.", variant: "destructive" });
-            router.replace("/dashboard/admin/manage-videos");
-          }
-        })
-        .catch(err => {
-          console.error("Failed to fetch video:", err);
-          toast({ title: "Error", description: "Failed to load video.", variant: "destructive" });
-        })
-        .finally(() => setIsLoadingData(false));
-    } else if (!authLoading && !videoId) {
-        toast({ title: "Error", description: "Video ID is missing.", variant: "destructive" });
-        router.replace("/dashboard/admin/manage-videos");
-        setIsLoadingData(false);
+      if (videoId) {
+        setIsLoadingData(true);
+        getVideoById(videoId)
+          .then(data => {
+            if (data) {
+              setVideo(data);
+            } else {
+              toast({ title: "Error", description: "Video not found.", variant: "destructive" });
+              router.replace("/dashboard/admin/manage-videos");
+            }
+          })
+          .catch(err => {
+            console.error("Failed to fetch video:", err);
+            toast({ title: "Error", description: "Failed to load video.", variant: "destructive" });
+          })
+          .finally(() => setIsLoadingData(false));
+      } else if (!videoId) {
+          toast({ title: "Error", description: "Video ID is missing.", variant: "destructive" });
+          router.replace("/dashboard/admin/manage-videos");
+          setIsLoadingData(false);
+      }
     }
-  }, [isAdmin, authLoading, router, toast, videoId]);
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, videoId, pathname]);
 
-  if (authLoading || isLoadingData || (!video && isAdmin)) {
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData && !video)) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-60" />
@@ -71,15 +82,11 @@ export default function EditVideoPage() {
          <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-3 text-lg">
-                {authLoading ? "Verifying admin access..." : "Loading video data..."}
+                {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading video data..."}
             </p>
         </div>
       </div>
     );
-  }
-  
-  if (!isAdmin && !authLoading) {
-      return null;
   }
 
   return (

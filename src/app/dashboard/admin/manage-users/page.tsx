@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, UserPlus, Trash2, Users as UsersIcon, Edit } from "lucide-react"; 
+import { MoreHorizontal, UserPlus, Trash2, Users as UsersIcon, Edit, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,26 +26,30 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useEffect, useState, useTransition, useCallback } from "react";
 import type { User as AppUser } from "@/types";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { getUsers as fetchUsersFromDB } from "@/lib/data";
-import { deleteUser as deleteUserAction } from "@/lib/actions";
-import { Skeleton } from "@/components/ui/skeleton";
+import { deleteUser as deleteUserAction, fetchAllUsersAction } from "@/lib/actions"; // Use Server Action
 
 export default function ManageUsersPage() {
-  const { profile: currentUserProfile, isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+  const currentUserId = session?.user?.id;
+
   const loadUsers = useCallback(async () => {
     if (isAdmin) {
       setIsLoadingData(true);
       try {
-        const allUsers = await fetchUsersFromDB();
+        const allUsers = await fetchAllUsersAction(); // Use Server Action
         setUsers(allUsers);
       } catch (error) {
         console.error("Failed to fetch users:", error);
@@ -57,22 +61,23 @@ export default function ManageUsersPage() {
     }
   }, [isAdmin, toast]);
 
-
   useEffect(() => {
-    if (!authLoading) {
-      if (!isAdmin) {
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+      } else if (!isAdmin) {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
         loadUsers();
       }
     }
-  }, [currentUserProfile, isAdmin, authLoading, router, toast, loadUsers]);
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, loadUsers, pathname]);
 
   const handleDeleteUser = async () => {
     if (!userToDelete || !userToDelete.id) return;
 
-    if (userToDelete.id === currentUserProfile?.id) {
+    if (userToDelete.id === currentUserId) {
       toast({
         title: "Action Denied",
         description: "Administrators cannot delete their own profiles from this interface.",
@@ -81,9 +86,9 @@ export default function ManageUsersPage() {
       setUserToDelete(null);
       return;
     }
-    
+
     startTransition(async () => {
-      const result = await deleteUserAction(userToDelete.id!); 
+      const result = await deleteUserAction(userToDelete.id!);
       if (result.success) {
         setUsers((prevUsers) => prevUsers.filter((u) => u.id !== userToDelete.id));
         toast({ title: "User Profile Deleted", description: result.message });
@@ -93,51 +98,17 @@ export default function ManageUsersPage() {
       setUserToDelete(null);
     });
   };
-  
-  const overallLoading = authLoading || (isLoadingData && isAdmin);
 
-  if (overallLoading) {
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData)) {
     return (
-      <div className="space-y-8">
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <Skeleton className="h-8 w-1/2" />
-              <Skeleton className="h-4 w-3/4 mt-1" />
-            </div>
-            <Skeleton className="h-10 w-40" /> 
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardContent className="p-0">
-             <Table>
-              <TableHeader>
-                <TableRow>
-                  {[...Array(5)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(3)].map((_, i) => (
-                  <TableRow key={i}>
-                    {[...Array(5)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-         <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            <p className="ml-3 text-lg">{authLoading ? "Verifying admin access..." : "Loading user data..."}</p>
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">
+          {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading user data..."}
+        </p>
       </div>
     );
   }
-  
-  if (!isAdmin && !authLoading) { 
-      return null; 
-  }
-
 
   return (
     <div className="space-y-8">
@@ -195,17 +166,17 @@ export default function ManageUsersPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem disabled> <Edit className="mr-2 h-4 w-4" /> Edit User (Coming Soon)</DropdownMenuItem>
-                          <DropdownMenuItem disabled={isPending || user.id === currentUserProfile?.id}>
+                          <DropdownMenuItem disabled={isPending || user.id === currentUserId}>
                             {user.role === 'user' ? 'Make Admin (Coming Soon)' : 'Make User (Coming Soon)'}
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled={isPending || user.id === currentUserProfile?.id}>
+                          <DropdownMenuItem disabled={isPending || user.id === currentUserId}>
                             Deactivate User (Coming Soon)
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setUserToDelete(user)}
                             className="text-destructive focus:bg-destructive/20 focus:text-destructive-foreground"
-                            disabled={isPending || user.id === currentUserProfile?.id}
+                            disabled={isPending || user.id === currentUserId}
                           >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete User Profile
                           </DropdownMenuItem>
@@ -226,7 +197,7 @@ export default function ManageUsersPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will delete the user profile for &quot;{userToDelete.name || userToDelete.email}&quot; from the application&apos;s user table. This disassociates their feedback but does NOT automatically delete their Supabase authentication account.
+                This action will delete the user profile for &quot;{userToDelete.name || userToDelete.email}&quot; from the application&apos;s user table. This disassociates their feedback but does NOT automatically delete their NextAuth.js accounts or sessions if using OAuth.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -248,4 +219,3 @@ export default function ManageUsersPage() {
   );
 }
 
-    

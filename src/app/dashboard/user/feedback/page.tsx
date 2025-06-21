@@ -1,46 +1,68 @@
+
 "use client";
 
-import { useAuth } from "@/context/auth-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FeedbackItem } from "@/components/projects/feedback-item"; // Assuming FeedbackItem can be reused
-import { projects as allProjectsData } from "@/lib/data"; // Mock data
-import type { Feedback, Project } from "@/types";
+import { useSession } from "next-auth/react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { FeedbackItem } from "@/components/projects/feedback-item";
+import type { Feedback } from "@/types";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { getUserFeedbackAction } from "@/lib/actions";
 
 export default function MyFeedbackPage() {
-  const { user } = useAuth();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [myFeedback, setMyFeedback] = useState<Array<Feedback & { projectTitle: string, projectId: string }>>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const authLoading = status === 'loading';
+  const user = session?.user;
 
   useEffect(() => {
-    if (user) {
-      // Simulate fetching user's feedback from all projects
-      const userFeedback: Array<Feedback & { projectTitle: string, projectId: string }> = [];
-      allProjectsData.forEach((project: Project) => {
-        project.feedback?.forEach(fb => {
-          // In a real app, you'd filter by fb.userId === user.id
-          // For mock, we assume some feedback is by the current user by name match
-          if (fb.userName === user.name) { 
-            userFeedback.push({ ...fb, projectTitle: project.title, projectId: project.id });
-          }
-        });
-      });
-      // Sort by newest first
-      userFeedback.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setMyFeedback(userFeedback);
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
     }
-    setIsLoading(false);
-  }, [user]);
 
-  if (isLoading) {
-    return <p>Loading your feedback...</p>;
+    if (user) {
+      setIsLoadingData(true);
+      getUserFeedbackAction()
+        .then(feedbackData => {
+          setMyFeedback(feedbackData);
+        })
+        .catch(error => {
+          console.error("Failed to load user feedback:", error);
+          setMyFeedback([]);
+        })
+        .finally(() => {
+          setIsLoadingData(false);
+        });
+    } else if (status === 'authenticated' && !user) {
+      setIsLoadingData(false);
+    }
+  }, [user, status, router]);
+
+  if (authLoading || (status === 'authenticated' && isLoadingData)) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">Loading your feedback...</p>
+      </div>
+    );
   }
 
   if (!user) {
-    return <p>Please log in to see your feedback.</p>;
+    return (
+        <div className="text-center py-12">
+            <p className="text-xl text-muted-foreground mb-4">Please log in to see your feedback.</p>
+             <Button asChild className="button-hover">
+                <Link href="/login">Go to Login</Link>
+            </Button>
+        </div>
+    );
   }
 
   return (

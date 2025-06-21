@@ -1,93 +1,74 @@
 
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, MessageSquare, Star } from "lucide-react";
+import { MoreHorizontal, MessageSquare, Star, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Feedback } from "@/types";
-import { getAllFeedbackWithProjectTitles } from "@/lib/data";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from 'date-fns';
-import { Skeleton } from "@/components/ui/skeleton";
+import { fetchAllFeedbackWithProjectTitlesAction } from "@/lib/actions"; // Use Server Action
 
 type AggregatedFeedback = Feedback & { projectTitle: string };
 
 export default function ManageFeedbackPage() {
-  const { profile, isAdmin, isLoading: authLoading } = useAuth(); // Changed user to profile for consistency
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const [allFeedback, setAllFeedback] = useState<AggregatedFeedback[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  useEffect(() => {
-    const fetchFeedback = async () => {
-      if (!authLoading) {
-        if (!isAdmin) {
-          toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-          router.replace("/dashboard/user");
-          return;
-        }
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
 
-        setIsLoadingData(true);
-        try {
-          const feedbackList = await getAllFeedbackWithProjectTitles();
-          setAllFeedback(feedbackList);
-        } catch (error) {
-          console.error("Failed to fetch feedback:", error);
-          toast({ title: "Error", description: "Failed to load feedback.", variant: "destructive"});
-        } finally {
-          setIsLoadingData(false);
-        }
+  const loadFeedback = useCallback(async () => {
+    if (isAdmin) {
+      setIsLoadingData(true);
+      try {
+        const feedbackList = await fetchAllFeedbackWithProjectTitlesAction(); // Use Server Action
+        setAllFeedback(feedbackList);
+      } catch (error) {
+        console.error("Failed to fetch feedback:", error);
+        toast({ title: "Error", description: "Failed to load feedback.", variant: "destructive"});
+      } finally {
+        setIsLoadingData(false);
       }
-    };
-    fetchFeedback();
-  }, [profile, isAdmin, authLoading, router, toast]); // Updated dependency array
+    }
+  }, [isAdmin, toast]);
 
-  if (authLoading || (isLoadingData && isAdmin)) {
+  useEffect(() => {
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+        return;
+      }
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+        return;
+      }
+      loadFeedback();
+    }
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, pathname, loadFeedback]);
+
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData)) {
     return (
-      <div className="space-y-8">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {[...Array(7)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(3)].map((_, i) => (
-                  <TableRow key={i}>
-                    {[...Array(7)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-         <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            <p className="ml-3 text-lg">Verifying access and loading feedback...</p>
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">
+          {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading feedback..."}
+        </p>
       </div>
     );
   }
-
-  if (!isAdmin && !authLoading) {
-      return null;
-  }
-
 
   return (
     <div className="space-y-8">
@@ -149,9 +130,9 @@ export default function ManageFeedbackPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Full Feedback</DropdownMenuItem>
-                          <DropdownMenuItem>Mark as Reviewed</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">Delete Feedback</DropdownMenuItem>
+                          <DropdownMenuItem disabled>View Full Feedback</DropdownMenuItem>
+                          <DropdownMenuItem disabled>Mark as Reviewed</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" disabled>Delete Feedback</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

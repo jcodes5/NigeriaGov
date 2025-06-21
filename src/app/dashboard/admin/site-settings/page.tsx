@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,9 @@ import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { fetchSiteSettingsAction, updateSiteSettingsAction } from "@/lib/actions";
-import type { SiteSettings } from "@/types"; // Assuming SiteSettings type is defined
+import type { SiteSettings } from "@/types";
 import { Loader2 } from "lucide-react";
 
 const settingsSchema = z.object({
@@ -35,20 +35,27 @@ const defaultSettings: SiteSettingsFormData = {
 };
 
 export default function SiteSettingsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [initialSettings, setInitialSettings] = useState<SiteSettingsFormData>(defaultSettings);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<SiteSettingsFormData>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: initialSettings, 
+    defaultValues: initialSettings,
   });
-  
+
   useEffect(() => {
-    if (!authLoading) {
-      if (!isAdmin) {
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+      } else if (!isAdmin) {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
@@ -76,7 +83,7 @@ export default function SiteSettingsPage() {
         loadSettings();
       }
     }
-  }, [isAdmin, authLoading, router, toast, reset]);
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, reset, pathname]);
 
 
   const onSubmit: SubmitHandler<SiteSettingsFormData> = async (data) => {
@@ -92,8 +99,8 @@ export default function SiteSettingsPage() {
         contactEmail: result.settings?.contactEmail ?? data.contactEmail ?? defaultSettings.contactEmail,
         footerMessage: result.settings?.footerMessage ?? data.footerMessage ?? defaultSettings.footerMessage,
       };
-      setInitialSettings(updatedFormValues); // Update initialSettings to reflect saved state
-      reset(updatedFormValues); // Reset form with newly saved (and potentially defaulted by server) values
+      setInitialSettings(updatedFormValues);
+      reset(updatedFormValues);
     } else {
       toast({
         title: "Error Saving Settings",
@@ -102,20 +109,17 @@ export default function SiteSettingsPage() {
       });
     }
   };
-  
-  if (authLoading || (isAdmin && isLoadingSettings)) {
+
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingSettings)) {
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <Loader2 className="animate-spin h-12 w-12 text-primary" />
         <p className="ml-3 text-lg">
-          {authLoading ? "Verifying admin access..." : "Loading site settings..."}
+          {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading site settings..."}
         </p>
       </div>
     );
   }
-
-  if (!isAdmin && !authLoading) return null;
-
 
   return (
     <div className="space-y-8">
@@ -164,7 +168,7 @@ export default function SiteSettingsPage() {
                    <Switch
                     id="maintenanceMode"
                     checked={field.value}
-                    onCheckedChange={field.onChange}                    
+                    onCheckedChange={field.onChange}
                   />
                 )}
               />
@@ -173,7 +177,7 @@ export default function SiteSettingsPage() {
             {errors.maintenanceMode && <p className="text-sm text-destructive mt-1">{errors.maintenanceMode.message}</p>}
           </CardContent>
         </Card>
-        
+
         <div className="mt-8 flex flex-col sm:flex-row sm:justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => reset(initialSettings)} disabled={isSubmitting} className="w-full sm:w-auto">
                 Reset Changes
@@ -187,4 +191,3 @@ export default function SiteSettingsPage() {
   );
 }
 
-    

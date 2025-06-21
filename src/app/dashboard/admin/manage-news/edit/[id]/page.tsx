@@ -3,9 +3,9 @@
 
 import { NewsArticleForm } from "@/components/admin/news-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,48 +15,56 @@ import type { NewsArticle } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EditNewsArticlePage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const articleId = params.id as string;
   const { toast } = useToast();
   const [article, setArticle] = useState<NewsArticle | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-      router.replace("/dashboard/user");
-      return;
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+        return;
+      }
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+        return;
+      }
+
+      if (articleId) {
+        setIsLoadingData(true);
+        getNewsArticleById(articleId)
+          .then(data => {
+            if (data) {
+              setArticle(data);
+            } else {
+              toast({ title: "Error", description: "News article not found.", variant: "destructive" });
+              router.replace("/dashboard/admin/manage-news");
+            }
+          })
+          .catch(err => {
+            console.error("Failed to fetch article:", err);
+            toast({ title: "Error", description: "Failed to load news article.", variant: "destructive" });
+          })
+          .finally(() => setIsLoadingData(false));
+      } else if (!articleId) {
+          toast({ title: "Error", description: "Article ID is missing.", variant: "destructive" });
+          router.replace("/dashboard/admin/manage-news");
+          setIsLoadingData(false);
+      }
     }
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, articleId, pathname]);
 
-    if (isAdmin && articleId) {
-      setIsLoadingData(true);
-      getNewsArticleById(articleId)
-        .then(data => {
-          if (data) {
-            setArticle(data);
-          } else {
-            toast({ title: "Error", description: "News article not found.", variant: "destructive" });
-            router.replace("/dashboard/admin/manage-news");
-          }
-        })
-        .catch(err => {
-          console.error("Failed to fetch article:", err);
-          toast({ title: "Error", description: "Failed to load news article.", variant: "destructive" });
-        })
-        .finally(() => setIsLoadingData(false));
-    } else if (!authLoading && !articleId) {
-        // Handle case where ID might be missing after auth check (should not happen if routing is correct)
-        toast({ title: "Error", description: "Article ID is missing.", variant: "destructive" });
-        router.replace("/dashboard/admin/manage-news");
-        setIsLoadingData(false);
-    }
-
-
-  }, [isAdmin, authLoading, router, toast, articleId]);
-
-  if (authLoading || isLoadingData || (!article && isAdmin)) { // Show loader if auth is loading, data is loading, or if admin but article not yet fetched
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData && !article)) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-60" />
@@ -74,15 +82,11 @@ export default function EditNewsArticlePage() {
          <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-3 text-lg">
-                {authLoading ? "Verifying admin access..." : "Loading article data..."}
+                {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading article data..."}
             </p>
         </div>
       </div>
     );
-  }
-  
-  if (!isAdmin && !authLoading) { // Fallback if useEffect redirect doesn't catch it immediately
-      return null;
   }
 
   return (

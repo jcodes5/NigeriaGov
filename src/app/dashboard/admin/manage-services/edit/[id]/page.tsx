@@ -3,9 +3,9 @@
 
 import { ServiceForm } from "@/components/admin/service-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,45 +15,56 @@ import type { ServiceItem } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EditServicePage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const serviceId = params.id as string;
   const { toast } = useToast();
   const [service, setService] = useState<ServiceItem | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-      router.replace("/dashboard/user");
-      return;
-    }
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+        return;
+      }
+      if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+        return;
+      }
 
-    if (isAdmin && serviceId) {
-      setIsLoadingData(true);
-      getServiceById(serviceId)
-        .then(data => {
-          if (data) {
-            setService(data);
-          } else {
-            toast({ title: "Error", description: "Service not found.", variant: "destructive" });
-            router.replace("/dashboard/admin/manage-services");
-          }
-        })
-        .catch(err => {
-          console.error("Failed to fetch service:", err);
-          toast({ title: "Error", description: "Failed to load service.", variant: "destructive" });
-        })
-        .finally(() => setIsLoadingData(false));
-    } else if (!authLoading && !serviceId) {
-        toast({ title: "Error", description: "Service ID is missing.", variant: "destructive" });
-        router.replace("/dashboard/admin/manage-services");
-        setIsLoadingData(false);
+      if (serviceId) {
+        setIsLoadingData(true);
+        getServiceById(serviceId)
+          .then(data => {
+            if (data) {
+              setService(data);
+            } else {
+              toast({ title: "Error", description: "Service not found.", variant: "destructive" });
+              router.replace("/dashboard/admin/manage-services");
+            }
+          })
+          .catch(err => {
+            console.error("Failed to fetch service:", err);
+            toast({ title: "Error", description: "Failed to load service.", variant: "destructive" });
+          })
+          .finally(() => setIsLoadingData(false));
+      } else if (!serviceId) {
+          toast({ title: "Error", description: "Service ID is missing.", variant: "destructive" });
+          router.replace("/dashboard/admin/manage-services");
+          setIsLoadingData(false);
+      }
     }
-  }, [isAdmin, authLoading, router, toast, serviceId]);
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, serviceId, pathname]);
 
-  if (authLoading || isLoadingData || (!service && isAdmin)) {
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData && !service)) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-10 w-60" />
@@ -71,15 +82,11 @@ export default function EditServicePage() {
          <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-3 text-lg">
-                {authLoading ? "Verifying admin access..." : "Loading service data..."}
+                {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading service data..."}
             </p>
         </div>
       </div>
     );
-  }
-  
-  if (!isAdmin && !authLoading) {
-      return null;
   }
 
   return (

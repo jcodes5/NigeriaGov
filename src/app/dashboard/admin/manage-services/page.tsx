@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, PlusCircle, Server, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Server, Edit, Trash2, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -18,35 +18,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import React, { useEffect, useState, useTransition } from "react";
-import type { ServiceItem } from "@/types"; 
-import { getAllServices as fetchServicesFromDb } from "@/lib/data"; 
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useTransition, useCallback } from "react";
+import type { ServiceItem } from "@/types";
+import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { Skeleton } from "@/components/ui/skeleton";
-import { deleteService } from "@/lib/actions";
+import { deleteService, fetchAllServicesAction } from "@/lib/actions"; // Use Server Action
 
 export default function ManageServicesPage() {
-  const { profile, isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [serviceToDelete, setServiceToDelete] = useState<ServiceItem | null>(null);
 
-  const fetchAdminServices = React.useCallback(async () => {
-    if (!authLoading) {
-      if (!isAdmin) {
-        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-        router.replace("/dashboard/user");
-        return;
-      }
-      
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+
+  const fetchAdminServices = useCallback(async () => {
+    if (!isLoadingAuth && isAdmin) {
       setIsLoadingData(true);
       try {
-        const fetchedServices = await fetchServicesFromDb(); 
+        const fetchedServices = await fetchAllServicesAction(); // Use Server Action
         setServices(fetchedServices);
       } catch (error) {
         console.error("Failed to fetch services for admin:", error);
@@ -56,11 +53,20 @@ export default function ManageServicesPage() {
         setIsLoadingData(false);
       }
     }
-  }, [isAdmin, authLoading, router, toast]);
+  }, [isAdmin, isLoadingAuth, toast]);
 
   useEffect(() => {
-    fetchAdminServices();
-  }, [fetchAdminServices]);
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+      } else if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+      } else {
+        fetchAdminServices();
+      }
+    }
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, fetchAdminServices, pathname]);
 
   const handleDeleteService = async () => {
     if (!serviceToDelete) return;
@@ -77,48 +83,15 @@ export default function ManageServicesPage() {
     });
   };
 
-  const overallLoading = authLoading || (isLoadingData && isAdmin);
-
-  if (overallLoading) {
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData)) {
     return (
-      <div className="space-y-8">
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <Skeleton className="h-8 w-1/2" />
-              <Skeleton className="h-4 w-3/4 mt-1" />
-            </div>
-            <Skeleton className="h-10 w-40" /> 
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardContent className="p-0">
-             <Table>
-              <TableHeader>
-                <TableRow>
-                  {[...Array(4)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(3)].map((_, i) => (
-                  <TableRow key={i}>
-                    {[...Array(4)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-         <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            <p className="ml-3 text-lg">{authLoading ? "Verifying admin access..." : "Loading services..."}</p>
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">
+          {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading services..."}
+        </p>
       </div>
     );
-  }
-  
-  if (!isAdmin && !authLoading) { 
-      return null; 
   }
 
   return (
@@ -180,11 +153,11 @@ export default function ManageServicesPage() {
                           {service.link ? (
                             <DropdownMenuItem asChild><a href={service.link} target="_blank" rel="noopener noreferrer">Visit External Link</a></DropdownMenuItem>
                           ) : service.slug ? (
-                            <DropdownMenuItem asChild><Link href={`/services/${service.slug}`} target="_blank">View Service Page</Link></DropdownMenuItem>
+                            <DropdownMenuItem asChild><Link href={`/services/${service.slug}`} target="_blank" rel="noopener noreferrer">View Service Page</Link></DropdownMenuItem>
                           ) : null}
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => setServiceToDelete(service)} 
+                          <DropdownMenuItem
+                            onClick={() => setServiceToDelete(service)}
                             className="text-destructive"
                             disabled={isDeleting}
                           >

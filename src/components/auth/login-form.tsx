@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
-import Link from 'next/link';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -20,7 +19,7 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+export function LoginForm({ dictionary }: { dictionary: any }) {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,27 +56,25 @@ export function LoginForm() {
   const handleGoogleSignIn = async () => {
     setIsLoadingGoogle(true);
     const redirectUrl = searchParams.get('redirect') || '/dashboard/user';
-    // The callbackUrl will be handled by NextAuth.js based on the redirect URI configured in Google Cloud Console
-    await signIn('google', { callbackUrl: redirectUrl }); 
-    // No need to setIsLodaingGoogle(false) here as the page will redirect
+    await signIn('google', { callbackUrl: redirectUrl });
   };
-  
+
   const overallLoading = isLoadingCredentials || isLoadingGoogle;
 
   return (
     <div className="space-y-6">
-      <Button 
-        variant="outline" 
-        className="w-full button-hover" 
+      <Button
+        variant="outline"
+        className="w-full button-hover"
         onClick={handleGoogleSignIn}
         disabled={overallLoading}
       >
-        {isLoadingGoogle ? 'Processing...' : (
+        {isLoadingGoogle ? dictionary.processing : (
           <>
             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
               <path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.3 512 0 398.5 0 256S110.3 0 244 0c69.8 0 130.8 28.4 175.2 72.9L358.3 167.1C329.3 139.2 290.5 121.4 244 121.4c-73.3 0-133.5 58.4-133.5 130.6s60.2 130.6 133.5 130.6c76.8 0 114.1-51.7 117.8-76.3H244V261.8h244z"></path>
             </svg>
-            Sign in with Google
+            {dictionary.google_signin}
           </>
         )}
       </Button>
@@ -88,14 +85,14 @@ export function LoginForm() {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-background px-2 text-muted-foreground">
-            Or continue with
+            {dictionary.or_continue_with}
           </span>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div>
-          <Label htmlFor="email">Email Address</Label>
+          <Label htmlFor="email">{dictionary.email_label}</Label>
           <Input
             id="email"
             type="email"
@@ -109,14 +106,7 @@ export function LoginForm() {
 
         <div>
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            {/* 
-            <Button variant="link" asChild className="p-0 text-xs font-medium text-primary hover:text-primary/80">
-              <Link href="/forgot-password"> 
-                Forgot password?
-              </Link>
-            </Button>
-            */}
+            <Label htmlFor="password">{dictionary.password_label}</Label>
           </div>
           <Input
             id="password"
@@ -128,9 +118,9 @@ export function LoginForm() {
           />
           {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
         </div>
-        
+
         <Button type="submit" className="w-full button-hover" disabled={overallLoading}>
-          {isLoadingCredentials ? 'Logging in...' : 'Log In with Email'}
+          {isLoadingCredentials ? dictionary.logging_in : dictionary.login_button}
         </Button>
       </form>
     </div>

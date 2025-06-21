@@ -10,14 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addNewsArticle, updateNewsArticle } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { newsArticleFormSchemaRaw, type NewsArticle, type NewsArticleFormData } from "@/types";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import { Card, CardDescription } from "@/components/ui/card";
 
 // Construct the Zod schema using the imported raw parts
 const newsSchema = z.object({
@@ -29,7 +31,7 @@ const newsSchema = z.object({
   content: newsArticleFormSchemaRaw.content(z),
   imageUrl: newsArticleFormSchemaRaw.imageUrl(z).nullable(),
   dataAiHint: newsArticleFormSchemaRaw.dataAiHint(z).nullable(),
-});
+}) as z.ZodType<NewsArticleFormData>;
 
 
 interface NewsArticleFormProps {
@@ -42,6 +44,7 @@ export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArtic
   const { toast } = useToast();
   const router = useRouter();
   const isEditMode = !!articleId;
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
 
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue } = useForm<NewsArticleFormData>({
     resolver: zodResolver(newsSchema),
@@ -61,7 +64,7 @@ export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArtic
       dataAiHint: "",
     },
   });
-  
+
   useEffect(() => {
     if (initialData) {
       reset({
@@ -70,15 +73,33 @@ export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArtic
         imageUrl: initialData.imageUrl || "",
         dataAiHint: initialData.dataAiHint || "",
       });
+      setImagePreview(initialData.imageUrl || null);
     }
   }, [initialData, reset]);
 
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      // Important: Clear the imageUrl text field when a new file is selected for preview.
+      // The user must upload the selected file and paste the new URL.
+      setValue('imageUrl', '');
+    } else {
+      // If no file is selected, or selection is cancelled, revert to initial image or clear.
+      setImagePreview(initialData?.imageUrl || null);
+      setValue('imageUrl', initialData?.imageUrl || '');
+    }
+  };
 
   const onSubmit: SubmitHandler<NewsArticleFormData> = async (data) => {
     const dataToSubmit = {
       ...data,
-      imageUrl: data.imageUrl || null, // Ensure null if empty string
-      dataAiHint: data.dataAiHint || null, // Ensure null if empty string
+      imageUrl: data.imageUrl || null,
+      dataAiHint: data.dataAiHint || null,
     };
 
     let result;
@@ -93,10 +114,13 @@ export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArtic
         title: isEditMode ? "News Article Updated!" : "News Article Added!",
         description: result.message,
       });
-      if (!isEditMode) reset(); // Only reset if adding new
+      if (!isEditMode) {
+        reset();
+        setImagePreview(null);
+      }
       if (onSuccess) onSuccess();
       router.push("/dashboard/admin/manage-news");
-      router.refresh(); // Ensure list page is updated
+      router.refresh();
     } else {
       toast({
         title: isEditMode ? "Error Updating Article" : "Error Adding Article",
@@ -122,7 +146,7 @@ export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArtic
            {isEditMode && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
         </div>
       </div>
-      
+
       <div>
         <Label htmlFor="summary">Summary</Label>
         <Textarea id="summary" {...register("summary")} rows={3} className="mt-1" />
@@ -167,10 +191,24 @@ export function NewsArticleForm({ initialData, articleId, onSuccess }: NewsArtic
         {errors.content && <p className="text-sm text-destructive mt-1">{errors.content.message}</p>}
       </div>
 
+      <Card className="p-4 space-y-3 bg-muted/30">
+        <Label htmlFor="imageFile">Featured Image</Label>
+        <Input id="imageFile" type="file" accept="image/*" onChange={handleImageFileChange} className="mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
+        {imagePreview && (
+          <div className="mt-2">
+            <Label>Image Preview:</Label>
+            <Image src={imagePreview} alt="Preview" width={200} height={120} className="mt-1 rounded-md border object-cover aspect-video" />
+          </div>
+        )}
+        <CardDescription className="text-xs">
+          Select an image file from your computer to preview. After previewing, you must upload this image to your own storage (e.g., Firebase Storage) and then paste the public URL into the 'Image URL' field below.
+        </CardDescription>
+      </Card>
+
        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label htmlFor="imageUrl">Image URL (Optional)</Label>
-          <Input id="imageUrl" {...register("imageUrl")} className="mt-1" placeholder="https://example.com/image.png" />
+          <Label htmlFor="imageUrl">Image URL (Paste after uploading)</Label>
+          <Input id="imageUrl" {...register("imageUrl")} className="mt-1" placeholder="https://your-storage.com/image.png" />
           {errors.imageUrl && <p className="text-sm text-destructive mt-1">{errors.imageUrl.message}</p>}
         </div>
          <div>

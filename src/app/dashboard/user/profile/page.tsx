@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,72 +12,87 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Image from "next/image";
 import { useEffect } from "react";
-// TODO: Import a server action to update user profile in Prisma DB
+import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { updateUserNameAction } from "@/lib/actions";
 
 const profileSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
-  email: z.string().email("Invalid email address.").optional(), // Email might not be updatable here directly via Supabase if it's primary identifier
+  name: z.string().min(2, "Name must be at least 2 characters.").max(50, "Name cannot exceed 50 characters."),
+  email: z.string().email("Invalid email address.").optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function UserProfilePage() {
-  const { profile, isLoading: authLoading, authUser } = useAuth(); 
+  const { data: session, status, update: updateSession } = useSession();
   const { toast } = useToast();
+  const router = useRouter();
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue } = useForm<ProfileFormData>({
+  const authLoading = status === 'loading';
+  const user = session?.user;
+
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: profile?.name || "",
-      email: profile?.email || authUser?.email || "", // Email might be from Supabase authUser if profile not fully loaded
+      name: user?.name || "",
+      email: user?.email || "",
     },
   });
 
   useEffect(() => {
-    if (profile) {
-      setValue("name", profile.name || "");
-      setValue("email", profile.email || authUser?.email || "");
-    } else if (authUser) {
-        setValue("email", authUser.email || "");
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
     }
-  }, [profile, authUser, setValue]);
+    if (user) {
+      setValue("name", user.name || "");
+      setValue("email", user.email || "");
+    }
+  }, [user, status, router, setValue]);
 
+  const onSubmitName: SubmitHandler<ProfileFormData> = async (data) => {
+    if (!data.name) return;
 
-  const onSubmit: SubmitHandler<ProfileFormData> = async (data) => {
-    //setIsSubmitting(true); // useForm's isSubmitting handles this
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API
-    
-    // TODO: Implement actual profile update logic here
-    // 1. Call a server action to update the user's profile in your public 'users' table (Prisma)
-    //    const { success, error } = await updateUserProfile(profile.id, { name: data.name });
-    // 2. If Supabase email needs to be updated (more complex, involves re-verification):
-    //    await supabase.auth.updateUser({ email: data.email })
-    // 3. If successful, potentially re-fetch profile in AuthContext or update it locally.
-    
-    console.log("Profile update data (simulation):", data);
-    // For now, just show a toast and update form values if needed
-    toast({
-      title: "Profile Update (Simulated)",
-      description: "Your profile information update has been simulated.",
-    });
-    // If you were updating context:
-    // login({ ...user, name: data.name, email: data.email }); 
-    // reset(data); // Reset form with new default values
-    // setIsSubmitting(false);
+    const result = await updateUserNameAction(data.name);
+
+    if (result.success) {
+      await updateSession({ name: data.name });
+      toast({
+        title: "Profile Updated",
+        description: "Your name has been successfully updated.",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (authLoading) {
-    return <p>Loading profile...</p>;
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">Loading profile...</p>
+      </div>
+    );
   }
-  
-  if (!profile && !authUser) {
-    return <p>Please log in to view your profile. Redirecting...</p>; // Or redirect
-  }
-  
-  const currentName = profile?.name || "User";
-  const currentEmail = profile?.email || authUser?.email || "No email";
-  const avatarName = profile?.name || authUser?.email?.split('@')[0] || "User";
 
+  if (!user) {
+     return (
+        <div className="text-center py-12">
+            <p className="text-xl text-muted-foreground mb-4">Please log in to view your profile.</p>
+             <Button asChild className="button-hover" onClick={() => router.push('/login')}>
+                Go to Login
+            </Button>
+        </div>
+    );
+  }
+
+  const currentName = user.name || "User";
+  const currentEmail = user.email || "No email";
+  const initialAvatarName = user.name || user.email?.split('@')[0] || "User";
 
   return (
     <div className="space-y-8">
@@ -92,17 +107,21 @@ export default function UserProfilePage() {
         <div className="md:col-span-1">
             <Card>
                 <CardHeader className="items-center text-center">
-                    <Image 
-                        src={profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=13714C&color=fff&size=128&font-size=0.4`} 
-                        alt={currentName} 
-                        width={128} 
-                        height={128} 
-                        className="rounded-full border-4 border-primary shadow-md mb-4"
-                    />
+                    <div className="relative w-32 h-32 mb-4">
+                        <Image
+                            src={user.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(initialAvatarName)}&background=13714C&color=fff&size=128&font-size=0.4`}
+                            alt={currentName}
+                            width={128}
+                            height={128}
+                            className="rounded-full border-4 border-primary shadow-md object-cover"
+                        />
+                    </div>
                     <CardTitle className="font-headline text-xl">{currentName}</CardTitle>
                     <CardDescription>{currentEmail}</CardDescription>
-                    <Button variant="outline" size="sm" className="mt-2 button-hover">Change Avatar (Coming Soon)</Button>
                 </CardHeader>
+                <CardContent className="space-y-3 text-center">
+                    <p className="text-xs text-muted-foreground">Avatar can be changed via your social provider or Gravatar for email-based accounts. Direct upload feature coming soon.</p>
+                </CardContent>
             </Card>
         </div>
         <div className="md:col-span-2">
@@ -111,38 +130,29 @@ export default function UserProfilePage() {
                     <CardTitle>Edit Information</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <form onSubmit={handleSubmit(onSubmitName)} className="space-y-6">
                         <div>
                             <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" {...register("name")} className="mt-1" />
+                            <Input id="name" {...register("name")} className="mt-1" placeholder="Your full name"/>
                             {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                         </div>
                         <div>
                             <Label htmlFor="email">Email Address (Cannot be changed here)</Label>
-                            <Input 
-                                id="email" 
-                                type="email" 
-                                {...register("email")} 
-                                className="mt-1 bg-muted/50" 
-                                readOnly 
+                            <Input
+                                id="email"
+                                type="email"
+                                {...register("email")}
+                                className="mt-1 bg-muted/50 cursor-not-allowed"
+                                readOnly
                                 disabled
                             />
                             {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-                            <p className="text-xs text-muted-foreground mt-1">Email changes require a verification process and are handled separately.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Email changes for OAuth accounts are managed via the provider. For credentials accounts, this requires a dedicated verification process.</p>
                         </div>
-                        
-                        <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
-                             <Button 
-                                type="button" 
-                                variant="outline" 
-                                onClick={() => reset({ name: profile?.name || "", email: profile?.email || authUser?.email || "" })} 
-                                disabled={isSubmitting} 
-                                className="w-full sm:w-auto"
-                              >
-                                Cancel
-                            </Button>
-                            <Button type="submit" className="button-hover w-full sm:w-auto" disabled={isSubmitting}>
-                                {isSubmitting ? "Saving..." : "Save Changes (Simulated)"}
+
+                        <div className="flex justify-end">
+                            <Button type="submit" className="button-hover" disabled={isSubmitting}>
+                                {isSubmitting ? "Saving..." : "Save Name Changes"}
                             </Button>
                         </div>
                     </form>

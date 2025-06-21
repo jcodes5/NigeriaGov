@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/auth-context";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -29,27 +29,30 @@ import {
   BarChart3,
   ShieldAlert,
   Home,
-  Newspaper, 
-  Server, 
-  MessageSquare, 
+  Newspaper,
+  Server,
+  MessageSquare,
   PlayCircleIcon,
+  Loader2,
 } from "lucide-react";
 import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLanguage } from "@/context/language-context";
 
 const DashboardSidebarContent = () => {
-  const { isAdmin, logout } = useAuth(); // profile.role is now source of isAdmin
-  const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'admin';
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
+  const { dictionary } = useLanguage();
+  const t = dictionary.dashboard_sidebar;
 
 
   const handleLogout = async () => {
-    await logout(); // logout is now async
-    router.push("/");
-    router.refresh(); // Refresh to ensure server components update
+    const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : '/';
+    await signOut({ callbackUrl });
   };
-  
+
   const closeMobileSidebar = () => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setOpenMobile(false);
@@ -57,20 +60,20 @@ const DashboardSidebarContent = () => {
   }
 
   const commonLinks = [
-    { href: "/dashboard/user", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/user/profile", label: "Profile Settings", icon: Settings },
-    { href: "/dashboard/user/feedback", label: "My Feedback", icon: FileText },
+    { href: "/dashboard/user", label: t.overview, icon: LayoutDashboard },
+    { href: "/dashboard/user/profile", label: t.profile_settings, icon: Settings },
+    { href: "/dashboard/user/feedback", label: t.my_feedback, icon: FileText },
   ];
 
   const adminLinks = [
-    { href: "/dashboard/admin", label: "Admin Overview", icon: ShieldAlert },
-    { href: "/dashboard/admin/manage-users", label: "Manage Users", icon: Users },
-    { href: "/dashboard/admin/manage-projects", label: "Manage Projects", icon: BarChart3 },
-    { href: "/dashboard/admin/manage-news", label: "Manage News", icon: Newspaper },
-    { href: "/dashboard/admin/manage-services", label: "Manage Services", icon: Server },
-    { href: "/dashboard/admin/manage-videos", label: "Manage Videos", icon: PlayCircleIcon },
-    { href: "/dashboard/admin/manage-feedback", label: "Manage Feedback", icon: MessageSquare },
-    { href: "/dashboard/admin/site-settings", label: "Site Settings", icon: Settings },
+    { href: "/dashboard/admin", label: t.admin_overview, icon: ShieldAlert },
+    { href: "/dashboard/admin/manage-users", label: t.manage_users, icon: Users },
+    { href: "/dashboard/admin/manage-projects", label: t.manage_projects, icon: BarChart3 },
+    { href: "/dashboard/admin/manage-news", label: t.manage_news, icon: Newspaper },
+    { href: "/dashboard/admin/manage-services", label: t.manage_services, icon: Server },
+    { href: "/dashboard/admin/manage-videos", label: t.manage_videos, icon: PlayCircleIcon },
+    { href: "/dashboard/admin/manage-feedback", label: t.manage_feedback, icon: MessageSquare },
+    { href: "/dashboard/admin/site-settings", label: t.site_settings, icon: Settings },
   ];
 
   return (
@@ -85,9 +88,9 @@ const DashboardSidebarContent = () => {
         <SidebarMenu>
           <SidebarMenuItem>
              <Link href="/">
-                <SidebarMenuButton onClick={closeMobileSidebar} isActive={pathname === '/'} tooltip="Back to Homepage">
+                <SidebarMenuButton onClick={closeMobileSidebar} isActive={pathname === '/'} tooltip={t.homepage}>
                   <Home />
-                  Homepage
+                  {t.homepage}
                 </SidebarMenuButton>
               </Link>
           </SidebarMenuItem>
@@ -104,7 +107,7 @@ const DashboardSidebarContent = () => {
           ))}
           {isAdmin && (
             <>
-              <SidebarMenuSubButton className="font-semibold text-muted-foreground mt-4 mb-1 px-2">Admin Tools</SidebarMenuSubButton>
+              <SidebarMenuSubButton className="font-semibold text-muted-foreground mt-4 mb-1 px-2">{t.admin_tools}</SidebarMenuSubButton>
               {adminLinks.map((link) => (
                 <SidebarMenuItem key={link.href}>
                   <Link href={link.href}>
@@ -122,7 +125,7 @@ const DashboardSidebarContent = () => {
       </SidebarContent>
       <SidebarFooter>
         <Button variant="ghost" onClick={handleLogout} className="w-full justify-start">
-          <LogOut className="mr-2" /> Logout
+          <LogOut className="mr-2" /> {t.logout}
         </Button>
       </SidebarFooter>
     </>
@@ -135,42 +138,37 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { authUser, isLoading, profile } = useAuth(); // Using authUser from Supabase and profile from our DB
+  const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
+  const isLoading = status === 'loading';
+  const isAuthenticated = status === 'authenticated';
+
   useEffect(() => {
-    if (!isLoading && !authUser) {
-      // If not loading and no Supabase user, redirect to login
-      // Preserve the current path for redirection after login
+    if (status === 'unauthenticated') {
       const currentPath = pathname;
       router.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
     }
-  }, [authUser, isLoading, router, pathname]);
+  }, [status, router, pathname]);
 
-  if (isLoading || !authUser) { // Still loading or no Supabase user
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+        <Loader2 className="animate-spin h-16 w-16 text-primary" />
         <p className="ml-4 text-lg">Loading dashboard...</p>
       </div>
     );
   }
-  
-  // If Supabase user exists but profile is still loading (it might be a brief moment or if DB call fails)
-  // You might want a more specific loading indicator for profile fetching if it's slow
-  if (!profile && !isLoading) {
-     // This case could mean the profile doesn't exist in public.users or failed to fetch.
-     // For now, we show a generic loading, but you might want to handle this more gracefully.
-     // E.g., redirect to a profile setup page or show an error.
+
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
-        <p className="ml-4 text-lg">Loading user profile...</p>
+        <Loader2 className="animate-spin h-16 w-16 text-primary" />
+        <p className="ml-4 text-lg">Redirecting to login...</p>
       </div>
     );
   }
-
 
   return (
     <SidebarProvider defaultOpen={true}>

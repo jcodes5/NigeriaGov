@@ -3,16 +3,21 @@
 
 import { revalidatePath } from 'next/cache';
 import { summarizeFeedbackSentiment, type SummarizeFeedbackSentimentInput } from '@/ai/flows/summarize-feedback-sentiment';
-import { 
-  addFeedbackToProject as saveFeedbackToDb, 
+import {
+  addFeedbackToProject as saveFeedbackToDb,
   deleteUserById as removeUserFromDb,
   getUserProfileFromDb,
-  createProjectInDb as saveProjectToDb, 
+  createProjectInDb as saveProjectToDb,
   updateProjectInDb,
   deleteProjectFromDb,
-  getAllProjects as fetchAllProjectsFromDb, 
+  getAllProjects as fetchAllProjectsFromDb,
+  getAllNewsArticles as fetchAllNewsArticlesFromDb,
+  getAllServices as fetchAllServicesFromDb,
+  getUsers as fetchAllUsersFromDb,
+  getAllVideosFromDb as fetchAllVideosFromDb,
+  getAllFeedbackWithProjectTitles as fetchAllFeedbackWithProjectTitlesFromDb,
   type ProjectCreationData,
-  createNewsArticleInDb as saveNewsArticleToDb, 
+  createNewsArticleInDb as saveNewsArticleToDb,
   type NewsArticleCreationData,
   updateNewsArticleInDb,
   deleteNewsArticleFromDb,
@@ -26,11 +31,17 @@ import {
   deleteVideoFromDb,
   getSiteSettingsFromDb,
   updateSiteSettingsInDb,
+  getUserDashboardStatsFromDb, // New import
+  getUserFeedbackFromDb,     // New import
+  updateUserNameInDb,        // New import
 } from './data';
-import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData, SiteSettings } from '@/types';
+import type { Feedback as AppFeedback, User as AppUser, Project as AppProject, NewsArticle as AppNewsArticle, ServiceItem as AppServiceItem, Video as AppVideo, NewsArticleFormData, ProjectFormData, ServiceFormData, VideoFormData, SiteSettings, UserDashboardStats } from '@/types';
 import type { SiteSettingsFormData } from '@/app/dashboard/admin/site-settings/page';
 import prisma from './prisma';
-import bcrypt from 'bcryptjs'; // For password hashing
+import bcrypt from 'bcryptjs';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+
 
 export interface SubmitFeedbackResult {
   success: boolean;
@@ -48,7 +59,7 @@ export async function submitProjectFeedback(
       feedback: formData.comment,
     };
     const sentimentOutput = await summarizeFeedbackSentiment(sentimentInput);
-    
+
     const feedbackToSave = {
       userName: formData.userName,
       comment: formData.comment,
@@ -66,6 +77,8 @@ export async function submitProjectFeedback(
     revalidatePath(`/projects/${projectId}`);
     revalidatePath('/dashboard/admin/manage-feedback');
     revalidatePath(`/dashboard/user/feedback`);
+    revalidatePath(`/dashboard/user`);
+
 
     return {
       success: true,
@@ -139,12 +152,13 @@ export async function addProject(
       state_id: formData.stateId,
       status: formData.status,
       start_date: formData.startDate,
-      expected_end_date: formData.expectedEndDate,
+      expected_end_date: formData.expectedEndDate ?? null,
+      actual_end_date: null, // Add this line to satisfy ProjectCreationData
       description: formData.description,
-      budget: formData.budget,
-      expenditure: formData.expenditure,
+      budget: formData.budget ?? null,
+      expenditure: formData.expenditure ?? null,
       tags: formData.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
-      images: [], 
+      images: [],
       videos: [],
       impact_stats: [],
     };
@@ -156,14 +170,14 @@ export async function addProject(
 
     revalidatePath('/projects');
     revalidatePath('/dashboard/admin/manage-projects');
-    revalidatePath('/'); 
+    revalidatePath('/');
     return { success: true, message: 'Project added successfully!', item: newProject };
   } catch (error) {
     console.error('Error adding project:', error);
     let errorMessage = 'An unexpected error occurred while adding the project.';
     if (error instanceof Error) {
       errorMessage = error.message;
-      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('title')) { 
+      if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('title')) {
           errorMessage = 'A project with this title already exists.';
       }
     }
@@ -240,10 +254,14 @@ export async function addNewsArticle(
     }
 
     const dataToSave: NewsArticleCreationData = {
-      ...newsData,
-      publishedDate: newsData.publishedDate, 
-      imageUrl: newsData.imageUrl,
-      dataAiHint: newsData.dataAiHint,
+      title: newsData.title,
+      slug: newsData.slug,
+      summary: newsData.summary,
+      category: newsData.category,
+      publishedDate: newsData.publishedDate,
+      content: newsData.content,
+      imageUrl: newsData.imageUrl ?? null,
+      dataAiHint: newsData.dataAiHint ?? null,
     };
 
     const newArticle = await saveNewsArticleToDb(dataToSave);
@@ -254,7 +272,7 @@ export async function addNewsArticle(
     revalidatePath('/news');
     revalidatePath(`/news/${newArticle.slug}`);
     revalidatePath('/dashboard/admin/manage-news');
-    revalidatePath('/'); 
+    revalidatePath('/');
     return { success: true, message: 'News article added successfully!', item: newArticle };
   } catch (error) {
     console.error('Error adding news article:', error);
@@ -275,20 +293,24 @@ export async function updateNewsArticle(
 ): Promise<ActionResult<AppNewsArticle>> {
   try {
     if (newsData.slug) {
-      const existingArticleBySlug = await prisma.newsArticle.findFirst({ 
-        where: { 
+      const existingArticleBySlug = await prisma.newsArticle.findFirst({
+        where: {
           slug: newsData.slug,
-          id: { not: id } 
+          id: { not: id }
         }
       });
       if (existingArticleBySlug) {
         return { success: false, message: `Another news article with the slug "${newsData.slug}" already exists.`};
       }
     }
-    
+
     const dataToUpdate: Partial<NewsArticleCreationData> = {
-      ...newsData,
+      title: newsData.title,
+      slug: newsData.slug,
+      summary: newsData.summary,
+      category: newsData.category,
       publishedDate: newsData.publishedDate,
+      content: newsData.content,
       imageUrl: newsData.imageUrl,
       dataAiHint: newsData.dataAiHint,
     };
@@ -300,9 +322,9 @@ export async function updateNewsArticle(
     }
 
     revalidatePath('/news');
-    revalidatePath(`/news/${updatedArticle.slug}`); 
+    revalidatePath(`/news/${updatedArticle.slug}`);
     revalidatePath('/dashboard/admin/manage-news');
-    revalidatePath('/'); 
+    revalidatePath('/');
     return { success: true, message: 'News article updated successfully!', item: updatedArticle };
   } catch (error) {
     console.error('Error updating news article:', error);
@@ -345,7 +367,14 @@ export async function addService(
     }
 
     const dataToSave: ServiceCreationData = {
-      ...serviceData,
+      title: serviceData.title,
+      slug: serviceData.slug,
+      summary: serviceData.summary,
+      category: serviceData.category,
+      link: serviceData.link ?? null,
+      imageUrl: serviceData.imageUrl ?? null,
+      dataAiHint: serviceData.dataAiHint ?? null,
+      iconName: serviceData.iconName ?? null,
     };
 
     const newService = await saveServiceToDb(dataToSave);
@@ -389,8 +418,16 @@ export async function updateService(
     }
 
     const dataToUpdate: Partial<ServiceCreationData> = {
-      ...serviceData,
+      title: serviceData.title,
+      slug: serviceData.slug,
+      summary: serviceData.summary,
+      category: serviceData.category,
+      link: serviceData.link,
+      imageUrl: serviceData.imageUrl,
+      dataAiHint: serviceData.dataAiHint,
+      iconName: serviceData.iconName,
     };
+
 
     const updatedService = await updateServiceInDb(id, dataToUpdate);
     if (!updatedService) {
@@ -446,10 +483,11 @@ export async function addVideo(
 ): Promise<ActionResult<AppVideo>> {
   try {
     const dataToSave: VideoCreationData = {
-      ...videoData,
-      thumbnailUrl: videoData.thumbnailUrl || null,
-      dataAiHint: videoData.dataAiHint || null,
-      description: videoData.description || null,
+      title: videoData.title,
+      url: videoData.url,
+      thumbnailUrl: videoData.thumbnailUrl ?? null,
+      dataAiHint: videoData.dataAiHint ?? null,
+      description: videoData.description ?? null,
     };
 
     const newVideo = await saveVideoToDb(dataToSave);
@@ -458,7 +496,7 @@ export async function addVideo(
     }
 
     revalidatePath('/dashboard/admin/manage-videos');
-    revalidatePath('/'); 
+    revalidatePath('/');
     return { success: true, message: 'Video added successfully!', item: newVideo };
   } catch (error) {
     console.error('Error adding video:', error);
@@ -476,10 +514,11 @@ export async function updateVideo(
 ): Promise<ActionResult<AppVideo>> {
   try {
     const dataToUpdate: Partial<VideoCreationData> = {
-      ...videoData,
-      thumbnailUrl: videoData.thumbnailUrl || null,
-      dataAiHint: videoData.dataAiHint || null,
-      description: videoData.description || null,
+      title: videoData.title,
+      url: videoData.url,
+      thumbnailUrl: videoData.thumbnailUrl,
+      dataAiHint: videoData.dataAiHint,
+      description: videoData.description,
     };
 
     const updatedVideo = await updateVideoInDb(id, dataToUpdate);
@@ -516,6 +555,7 @@ export async function deleteVideo(id: string): Promise<ActionResult> {
   }
 }
 
+
 // --- Admin Dashboard Stats ---
 export async function fetchAdminDashboardStats() {
   try {
@@ -541,7 +581,7 @@ export async function fetchSiteSettingsAction(): Promise<SiteSettings | null> {
     return await getSiteSettingsFromDb();
   } catch (error) {
     console.error("Error fetching site settings via action:", error);
-    return null; 
+    return null;
   }
 }
 
@@ -559,17 +599,17 @@ export async function updateSiteSettingsAction(
     if (!updatedSettings) {
       return { success: false, message: 'Failed to save site settings to the database.' };
     }
-    revalidatePath('/'); 
+    revalidatePath('/');
     revalidatePath('/contact');
     revalidatePath('/dashboard/admin/site-settings');
 
     return { success: true, message: 'Site settings updated successfully!', settings: updatedSettings };
   } catch (error) {
     console.error('Error updating site settings via action:', error);
-    return { 
-      success: false, 
-      message: 'An unexpected error occurred while saving site settings.', 
-      errorDetails: error instanceof Error ? error.stack : undefined 
+    return {
+      success: false,
+      message: 'An unexpected error occurred while saving site settings.',
+      errorDetails: error instanceof Error ? error.stack : undefined
     };
   }
 }
@@ -578,7 +618,7 @@ export async function updateSiteSettingsAction(
 interface CreateUserResult {
   success: boolean;
   message: string;
-  user?: AppUser | null; // Return the created user on success
+  user?: AppUser | null;
 }
 
 export async function createUserAction(data: { name: string; email: string; password?: string }): Promise<CreateUserResult> {
@@ -595,9 +635,6 @@ export async function createUserAction(data: { name: string; email: string; pass
     if (data.password) {
       hashedPassword = await bcrypt.hash(data.password, 10);
     } else {
-      // This case should ideally not be hit if using credentials provider which requires password
-      // but as a fallback if we allow creation without password for OAuth later.
-      // For pure credentials, password should always be present.
       return { success: false, message: "Password is required for credentials signup." };
     }
 
@@ -605,13 +642,10 @@ export async function createUserAction(data: { name: string; email: string; pass
       data: {
         name: data.name,
         email: data.email,
-        password: hashedPassword, 
-        // role: 'user', // Default role, handled by Prisma schema default or can be set here
-        // emailVerified: null, // NextAuth typically handles this with VerificationToken for email provider
+        password: hashedPassword,
       },
     });
 
-    // Map Prisma user to AppUser for consistent return type
     const appUser: AppUser = {
         id: newUser.id,
         name: newUser.name,
@@ -628,7 +662,6 @@ export async function createUserAction(data: { name: string; email: string; pass
     console.error("Error creating user:", error);
     let errorMessage = "An unexpected error occurred during user creation.";
     if (error instanceof Error) {
-        // Check for Prisma specific errors, e.g., unique constraint violation if not caught by email check
         if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('email')) {
              errorMessage = 'An account with this email already exists.';
         } else {
@@ -636,5 +669,105 @@ export async function createUserAction(data: { name: string; email: string; pass
         }
     }
     return { success: false, message: errorMessage };
+  }
+}
+
+// --- Server Actions for Fetching Data for Admin Pages ---
+export async function fetchAllNewsArticlesAction(): Promise<AppNewsArticle[]> {
+  try {
+    return await fetchAllNewsArticlesFromDb();
+  } catch (error) {
+    console.error("Error fetching all news articles in action:", error);
+    throw new Error("Failed to fetch news articles via action.");
+  }
+}
+
+export async function fetchAllServicesAction(): Promise<AppServiceItem[]> {
+  try {
+    return await fetchAllServicesFromDb();
+  } catch (error) {
+    console.error("Error fetching all services in action:", error);
+    throw new Error("Failed to fetch services via action.");
+  }
+}
+
+export async function fetchAllUsersAction(): Promise<AppUser[]> {
+  try {
+    return await fetchAllUsersFromDb();
+  } catch (error) {
+    console.error("Error fetching all users in action:", error);
+    throw new Error("Failed to fetch users via action.");
+  }
+}
+
+export async function fetchAllVideosAction(): Promise<AppVideo[]> {
+  try {
+    return await fetchAllVideosFromDb();
+  } catch (error) {
+    console.error("Error fetching all videos in action:", error);
+    throw new Error("Failed to fetch videos via action.");
+  }
+}
+
+export async function fetchAllFeedbackWithProjectTitlesAction(): Promise<Array<AppFeedback & { projectTitle: string }>> {
+  try {
+    return await fetchAllFeedbackWithProjectTitlesFromDb();
+  } catch (error) {
+    console.error("Error fetching all feedback in action:", error);
+    throw new Error("Failed to fetch feedback via action.");
+  }
+}
+
+// --- NEW Server Actions for User Dashboard ---
+
+export async function getUserDashboardStatsAction(): Promise<UserDashboardStats> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error("User not authenticated");
+  }
+  try {
+    return await getUserDashboardStatsFromDb(session.user.id);
+  } catch (error) {
+    console.error("Error getting user dashboard stats:", error);
+    // Return default/empty stats on error
+    return {
+      feedbackSubmitted: 0,
+      bookmarkedProjects: 0,
+      averageRating: 0,
+    };
+  }
+}
+
+export async function getUserFeedbackAction(): Promise<Array<AppFeedback & { projectTitle: string, projectId: string }>> {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        throw new Error("User not authenticated");
+    }
+    try {
+        return await getUserFeedbackFromDb(session.user.id);
+    } catch (error) {
+        console.error("Error getting user feedback:", error);
+        return [];
+    }
+}
+
+export async function updateUserNameAction(newName: string): Promise<{ success: boolean; message: string; }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "User not authenticated" };
+  }
+  try {
+    const updatedUser = await updateUserNameInDb(session.user.id, newName);
+    if (!updatedUser) {
+        return { success: false, message: "Failed to update user name in database." };
+    }
+    // Revalidate paths that show user name
+    revalidatePath('/dashboard/user/profile');
+    revalidatePath('/dashboard/user');
+
+    return { success: true, message: "Name updated successfully." };
+  } catch (error) {
+    console.error("Error updating user name:", error);
+    return { success: false, message: "An unexpected error occurred." };
   }
 }

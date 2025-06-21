@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, PlusCircle, Construction, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Construction, Edit, Trash2, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -18,36 +18,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import React, { useEffect, useState, useTransition } from "react";
-import type { Project } from "@/types"; 
-import { getAllProjects } from "@/lib/data"; 
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useTransition, useCallback } from "react";
+import type { Project } from "@/types";
+import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import { deleteProject } from "@/lib/actions";
+import { deleteProject, fetchAllProjectsAction } from "@/lib/actions"; // Use Server Action
 
 export default function ManageProjectsPage() {
-  const { profile, isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
 
-  const fetchAdminProjects = React.useCallback(async () => {
-    if (!authLoading) {
-      if (!isAdmin) {
-        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-        router.replace("/dashboard/user");
-        return;
-      }
-      
+  const fetchAdminProjects = useCallback(async () => {
+    if (!isLoadingAuth && isAdmin) {
       setIsLoadingData(true);
       try {
-        const fetchedProjects = await getAllProjects(); 
+        const fetchedProjects = await fetchAllProjectsAction(); // Use Server Action
         setProjects(fetchedProjects);
       } catch (error) {
         console.error("Failed to fetch projects for admin:", error);
@@ -57,11 +53,20 @@ export default function ManageProjectsPage() {
         setIsLoadingData(false);
       }
     }
-  }, [isAdmin, authLoading, router, toast]);
+  }, [isAdmin, isLoadingAuth, toast]);
 
   useEffect(() => {
-    fetchAdminProjects();
-  }, [fetchAdminProjects]);
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+      } else if (!isAdmin) {
+        toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
+        router.replace("/dashboard/user");
+      } else {
+        fetchAdminProjects();
+      }
+    }
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, fetchAdminProjects, pathname]);
 
   const handleDeleteProject = async () => {
     if (!projectToDelete) return;
@@ -78,48 +83,15 @@ export default function ManageProjectsPage() {
     });
   };
 
-  const overallLoading = authLoading || (isLoadingData && isAdmin);
-
-  if (overallLoading) {
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingData)) {
     return (
-      <div className="space-y-8">
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <Skeleton className="h-8 w-1/2" />
-              <Skeleton className="h-4 w-3/4 mt-1" />
-            </div>
-            <Skeleton className="h-10 w-40" /> 
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardContent className="p-0">
-             <Table>
-              <TableHeader>
-                <TableRow>
-                  {[...Array(6)].map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...Array(3)].map((_, i) => (
-                  <TableRow key={i}>
-                    {[...Array(6)].map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-         <div className="flex items-center justify-center h-[calc(100vh-20rem)]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            <p className="ml-3 text-lg">{authLoading ? "Verifying admin access..." : "Loading projects..."}</p>
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+        <p className="ml-3 text-lg">
+          {isLoadingAuth || isUserNotAuthenticated ? "Verifying access..." : "Loading projects..."}
+        </p>
       </div>
     );
-  }
-  
-  if (!isAdmin && !authLoading) { 
-      return null; 
   }
 
   const statusColors: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -192,11 +164,11 @@ export default function ManageProjectsPage() {
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                             <Link href={`/projects/${project.id}`} target="_blank">View Project</Link>
+                             <Link href={`/projects/${project.id}`} target="_blank" rel="noopener noreferrer">View Project</Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => setProjectToDelete(project)} 
+                          <DropdownMenuItem
+                            onClick={() => setProjectToDelete(project)}
                             className="text-destructive"
                             disabled={isDeleting}
                           >

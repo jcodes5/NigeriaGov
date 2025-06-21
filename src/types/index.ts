@@ -16,27 +16,27 @@ export interface State {
 export interface Feedback {
   id: string;
   project_id: string;
-  user_id: string | null; 
+  user_id: string | null;
   user_name: string;
   comment: string;
   rating: number | null;
   sentiment_summary: string | null;
-  created_at: string; 
-  user?: User; 
+  created_at: string;
+  user?: User;
 }
 
 
 export interface ImpactStat {
   label: string;
   value: string;
-  iconName?: keyof typeof LucideIcons; 
-  icon?: React.ElementType; 
+  iconName?: keyof typeof LucideIcons;
+  icon?: React.ElementType;
 }
 
 export interface Video {
   id: string;
   title: string;
-  url: string; 
+  url: string;
   thumbnailUrl?: string | null;
   description?: string | null;
   dataAiHint?: string | null;
@@ -44,24 +44,29 @@ export interface Video {
   updatedAt: Date;
 }
 
+export interface Tag {
+  id: number;
+  name: string;
+}
+
 export interface Project {
   id: string;
   title: string;
   subtitle: string;
-  ministry: Ministry; 
-  state: State;     
+  ministry: Ministry;
+  state: State;
   status: 'Ongoing' | 'Completed' | 'Planned' | 'On Hold';
-  startDate: Date; 
-  expectedEndDate?: Date | null; 
-  actualEndDate?: Date | null;   
+  startDate: Date;
+  expectedEndDate?: Date | null;
+  actualEndDate?: Date | null;
   description: string;
-  images: { url: string; alt: string, dataAiHint?: string }[]; 
-  videos?: Video[]; 
-  impactStats: ImpactStat[]; 
+  images: { url: string; alt: string, dataAiHint?: string }[];
+  videos?: Video[];
+  impactStats: ImpactStat[];
   budget?: number | null;
   expenditure?: number | null;
-  tags?: string[];
-  lastUpdatedAt: Date; 
+  tags?: string[]; // This will store tag names for display
+  lastUpdatedAt: Date;
   feedback?: Feedback[];
   ministry_id?: string | null;
   state_id?: string | null;
@@ -72,11 +77,10 @@ export interface User {
   id: string;
   name?: string | null;
   email?: string | null;
-  emailVerified?: Date | null; // NextAuth.js uses DateTime for this
-  image?: string | null;       // NextAuth.js uses 'image' instead of 'avatarUrl'
-  role?: 'user' | 'admin' | null; // Kept from original
-  created_at?: string | null;  // Kept from original (string to match existing pattern, Prisma handles Date)
-  // sessions and accounts are typically managed by NextAuth.js internally and might not be directly exposed here unless needed.
+  emailVerified?: Date | null;
+  image?: string | null;
+  role?: 'user' | 'admin' | null;
+  created_at?: string | null;
 }
 
 
@@ -85,10 +89,10 @@ export interface NewsArticle {
   slug: string;
   title: string;
   summary: string;
-  imageUrl?: string | null; 
-  dataAiHint?: string | null; 
+  imageUrl?: string | null;
+  dataAiHint?: string | null;
   category: string;
-  publishedDate: Date; 
+  publishedDate: Date;
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -100,8 +104,8 @@ export interface ServiceItem {
   slug: string;
   title: string;
   summary: string;
-  iconName?: keyof typeof LucideIcons | null; 
-  icon?: React.ElementType; 
+  iconName?: keyof typeof LucideIcons | null;
+  icon?: React.ElementType;
   link?: string | null;
   category: string;
   imageUrl?: string | null;
@@ -110,24 +114,129 @@ export interface ServiceItem {
   updatedAt: Date;
 }
 
-export const projectFormSchemaRaw = {
-  title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(150),
-  subtitle: (z: any) => z.string().min(10, "Subtitle must be at least 10 characters.").max(250),
-  ministryId: (z: any) => z.string().min(1, "Ministry is required."),
-  stateId: (z: any) => z.string().min(1, "State is required."),
-  status: (z: any) => z.enum(['Planned', 'Ongoing', 'Completed', 'On Hold']),
-  startDate: (z: any) => z.date({ required_error: "Start date is required." }),
-  expectedEndDate: (z: any) => z.date().optional().nullable(),
-  description: (z: any) => z.string().min(20, "Description must be at least 20 characters."),
-  budget: (z: any) => z.preprocess(
+export interface ProjectFormSchemaRaw {
+  title: (z: any) => any;
+  subtitle: (z: any) => any;
+  ministryId: (z: any) => any;
+  stateId: (z: any) => any;
+  status: (z: any) => any;
+  startDate: (z: any) => any;
+  expectedEndDate: (z: any) => any;
+  description: (z: any) => any;
+  budget: (z: any) => any;
+  expenditure: (z: any) => any;
+  tags: (z: any) => any;
+}
+
+export interface ProjectFormSchemaRawField {
+  (z: any): any;
+}
+
+export interface ProjectFormSchemaRaw {
+  title: ProjectFormSchemaRawField;
+  subtitle: ProjectFormSchemaRawField;
+  ministryId: ProjectFormSchemaRawField;
+  stateId: ProjectFormSchemaRawField;
+  status: ProjectFormSchemaRawField;
+  startDate: ProjectFormSchemaRawField;
+  expectedEndDate: ProjectFormSchemaRawField;
+  description: ProjectFormSchemaRawField;
+  budget: ProjectFormSchemaRawField;
+  expenditure: ProjectFormSchemaRawField;
+  tags: ProjectFormSchemaRawField;
+}
+
+export interface ProjectFormSchemaRawFieldConfig {
+  (z: any): any;
+}
+
+export interface ProjectFormSchemaRawTyped {
+  title: ProjectFormSchemaRawFieldConfig;
+  subtitle: ProjectFormSchemaRawFieldConfig;
+  ministryId: ProjectFormSchemaRawFieldConfig;
+  stateId: ProjectFormSchemaRawFieldConfig;
+  status: ProjectFormSchemaRawFieldConfig;
+  startDate: ProjectFormSchemaRawFieldConfig;
+  expectedEndDate: ProjectFormSchemaRawFieldConfig;
+  description: ProjectFormSchemaRawFieldConfig;
+  budget: ProjectFormSchemaRawFieldConfig;
+  expenditure: ProjectFormSchemaRawFieldConfig;
+  tags: ProjectFormSchemaRawFieldConfig;
+}
+
+export interface ProjectFormSchemaRawFieldConfigTyped {
+  (z: any): any;
+}
+
+export interface ProjectFormSchemaRawTypedWithFields {
+  title: ProjectFormSchemaRawFieldConfigTyped;
+  subtitle: ProjectFormSchemaRawFieldConfigTyped;
+  ministryId: ProjectFormSchemaRawFieldConfigTyped;
+  stateId: ProjectFormSchemaRawFieldConfigTyped;
+  status: ProjectFormSchemaRawFieldConfigTyped;
+  startDate: ProjectFormSchemaRawFieldConfigTyped;
+  expectedEndDate: ProjectFormSchemaRawFieldConfigTyped;
+  description: ProjectFormSchemaRawFieldConfigTyped;
+  budget: ProjectFormSchemaRawFieldConfigTyped;
+  expenditure: ProjectFormSchemaRawFieldConfigTyped;
+  tags: ProjectFormSchemaRawFieldConfigTyped;
+}
+
+export interface ProjectFormSchemaRawFieldConfigTyped {
+  (z: any): any;
+}
+
+export interface ProjectFormSchemaRawTypedWithFields {
+  title: ProjectFormSchemaRawFieldConfigTyped;
+  subtitle: ProjectFormSchemaRawFieldConfigTyped;
+  ministryId: ProjectFormSchemaRawFieldConfigTyped;
+  stateId: ProjectFormSchemaRawFieldConfigTyped;
+  status: ProjectFormSchemaRawFieldConfigTyped;
+  startDate: ProjectFormSchemaRawFieldConfigTyped;
+  expectedEndDate: ProjectFormSchemaRawFieldConfigTyped;
+  description: ProjectFormSchemaRawFieldConfigTyped;
+  budget: ProjectFormSchemaRawFieldConfigTyped;
+  expenditure: ProjectFormSchemaRawFieldConfigTyped;
+  tags: ProjectFormSchemaRawFieldConfigTyped;
+}
+
+export interface ProjectFormSchemaRawFieldConfigTyped {
+  (z: any): any;
+}
+
+export interface ProjectFormSchemaRawTypedWithFields {
+  title: ProjectFormSchemaRawFieldConfigTyped;
+  subtitle: ProjectFormSchemaRawFieldConfigTyped;
+  ministryId: ProjectFormSchemaRawFieldConfigTyped;
+  stateId: ProjectFormSchemaRawFieldConfigTyped;
+  status: ProjectFormSchemaRawFieldConfigTyped;
+  startDate: ProjectFormSchemaRawFieldConfigTyped;
+  expectedEndDate: ProjectFormSchemaRawFieldConfigTyped;
+  description: ProjectFormSchemaRawFieldConfigTyped;
+  budget: ProjectFormSchemaRawFieldConfigTyped;
+  expenditure: ProjectFormSchemaRawFieldConfigTyped;
+  tags: ProjectFormSchemaRawFieldConfigTyped;
+}
+
+export const projectFormSchemaRaw: ProjectFormSchemaRawTypedWithFields = {
+  title: (z: any): any => z.string().min(5, "Title must be at least 5 characters.").max(150),
+  subtitle: (z: any): any => z.string().min(10, "Subtitle must be at least 10 characters.").max(250),
+  ministryId: (z: any): any => z.string().min(1, "Ministry is required."),
+  stateId: (z: any): any => z.string().min(1, "State is required."),
+  status: (z: any): any => z.enum(['Planned', 'Ongoing', 'Completed', 'On Hold']),
+  startDate: (z: any): any => z.date({ required_error: "Start date is required." }),
+  expectedEndDate: (z: any): any => z.date().optional().nullable(),
+  description: (z: any): any => z.string().min(20, "Description must be at least 20 characters."),
+  budget: (z: any): any => z.preprocess(
     (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
     z.number().positive("Budget must be a positive number.").optional().nullable()
   ),
-  expenditure: (z: any) => z.preprocess(
+  expenditure: (z: any): any => z.preprocess(
     (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
     z.number().positive("Expenditure must be a positive number.").optional().nullable()
   ),
-  tags: (z: any) => z.string().optional(), 
+  // Tags from the form will be a comma-separated string of names
+  tags: (z: any): any => z.string().optional(),
 };
 
 export type ProjectFormData = {
@@ -141,7 +250,7 @@ export type ProjectFormData = {
   description: string;
   budget?: number | null;
   expenditure?: number | null;
-  tags?: string; 
+  tags?: string; // Comma-separated tag names
 };
 
 
@@ -193,7 +302,7 @@ export type ServiceFormData = {
 
 export const videoFormSchemaRaw = {
   title: (z: any) => z.string().min(5, "Title must be at least 5 characters.").max(200),
-  url: (z: any) => z.string().url("Must be a valid embeddable URL (e.g., YouTube embed link)."),
+  url: (z: any) => z.string().url("Must be a valid URL (e.g., from Cloudinary or YouTube embed)."),
   thumbnailUrl: (z: any) => z.string().url("Must be a valid URL.").optional().or(z.literal('')).nullable(),
   dataAiHint: (z: any) => z.string().max(50, "AI hint for thumbnail too long (max 2 words).").optional().nullable(),
   description: (z: any) => z.string().max(500, "Description too long.").optional().nullable(),
@@ -215,3 +324,11 @@ export interface SiteSettings {
   footerMessage: string | null;
   updatedAt: Date;
 }
+
+export interface UserDashboardStats {
+  feedbackSubmitted: number;
+  bookmarkedProjects: number;
+  averageRating: number;
+}
+
+

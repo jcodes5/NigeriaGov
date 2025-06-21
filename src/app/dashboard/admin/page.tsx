@@ -1,16 +1,16 @@
 
-"use client"; // Temporarily keep as client component due to Image component and potential auth interaction complexity for full server conversion
+"use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, FileText, BarChart3, ShieldAlert, Settings, Newspaper, Server, MessageSquare, PlayCircleIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
-import { fetchAdminDashboardStats } from "@/lib/actions"; // Import the server action
+import { fetchAdminDashboardStats } from "@/lib/actions";
 
 interface DashboardStats {
   totalProjects: number;
@@ -21,15 +21,22 @@ interface DashboardStats {
 }
 
 export default function AdminDashboardPage() {
-  const { profile, isAdmin, isLoading: authLoading } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
+  const isLoadingAuth = status === 'loading';
+  const isUserNotAuthenticated = status === 'unauthenticated';
+  const isAdmin = session?.user?.role === 'admin';
+
   useEffect(() => {
-    if (!authLoading) {
-      if (!isAdmin) {
+    if (!isLoadingAuth) {
+      if (isUserNotAuthenticated) {
+        router.replace(`/login?redirect=${pathname}`);
+      } else if (!isAdmin) {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
         router.replace("/dashboard/user");
       } else {
@@ -42,7 +49,7 @@ export default function AdminDashboardPage() {
           } catch (error) {
             console.error("Failed to fetch admin dashboard stats:", error);
             toast({ title: "Error", description: "Could not load dashboard statistics.", variant: "destructive"});
-            setStats({ // Fallback mock stats on error
+            setStats({
               totalProjects: 0,
               totalUsers: 0,
               totalNewsArticles: 0,
@@ -56,40 +63,36 @@ export default function AdminDashboardPage() {
         loadStats();
       }
     }
-  }, [profile, isAdmin, authLoading, router, toast]);
+  }, [session, status, isLoadingAuth, isUserNotAuthenticated, isAdmin, router, toast, pathname]);
 
-  if (authLoading || (isAdmin && isLoadingStats)) {
+  if (isLoadingAuth || isUserNotAuthenticated || (status === 'authenticated' && !isAdmin) || (isAdmin && isLoadingStats)) {
      return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <Loader2 className="animate-spin h-12 w-12 text-primary" />
         <p className="ml-3 text-lg">
-          {authLoading ? "Verifying admin access..." : "Loading dashboard data..."}
+          {isLoadingAuth || status === 'unauthenticated' ? "Verifying access..." : "Loading dashboard data..."}
         </p>
       </div>
     );
   }
 
-  if (!isAdmin && !authLoading) {
-    return null; // Render nothing if redirecting
-  }
-  
-  const adminName = profile?.name || 'Admin';
-  const adminAvatarName = profile?.name || profile?.email?.split('@')[0] || 'Admin';
+  const adminName = session?.user?.name || 'Admin';
+  const adminAvatarName = session?.user?.name || session?.user?.email?.split('@')[0] || 'Admin';
+  const adminAvatarUrl = session?.user?.image;
 
-  // Mock data for items not yet fetched from DB
-  const pendingApprovals = 5; 
-  const siteHealth = "Good"; 
+  const pendingApprovals = 5;
+  const siteHealth = "Good";
 
   return (
     <div className="space-y-8">
       <Card className="bg-gradient-to-r from-primary/10 via-background to-background shadow-sm">
         <CardHeader>
            <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left sm:space-x-4 space-y-2 sm:space-y-0">
-            <Image 
-                src={profile?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminAvatarName)}&background=13714C&color=fff&font-size=0.5`} 
-                alt={adminName} 
-                width={80} 
-                height={80} 
+            <Image
+                src={adminAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminAvatarName)}&background=13714C&color=fff&font-size=0.5`}
+                alt={adminName}
+                width={80}
+                height={80}
                 className="rounded-full border-2 border-primary shrink-0"
             />
             <div>
@@ -158,7 +161,7 @@ export default function AdminDashboardPage() {
         <Card className="card-hover shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Site Health</CardTitle>
-            <ShieldAlert className="h-5 w-5 text-green-500" /> 
+            <ShieldAlert className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{siteHealth}</div>
@@ -240,4 +243,3 @@ export default function AdminDashboardPage() {
   );
 }
 
-    

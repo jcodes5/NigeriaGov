@@ -2,9 +2,12 @@ import { LoginForm } from '@/components/auth/login-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
+  const { dictionary } = useLanguage();
+  const t = dictionary.login_page;
   return (
     <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
