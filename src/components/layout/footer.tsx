@@ -41,11 +41,11 @@ export function Footer() {
           <div>
             <h3 className="font-headline text-lg font-semibold text-foreground mb-3">{t.connect}</h3>
             <div className="flex space-x-4">
-              <Link href="#" aria-label="Facebook" className="hover:text-primary transition-colors"><Facebook size={20} /></Link>
-              <Link href="#" aria-label="Twitter" className="hover:text-primary transition-colors"><Twitter size={20} /></Link>
-              <Link href="#" aria-label="Instagram" className="hover:text-primary transition-colors"><Instagram size={20} /></Link>
-              <Link href="#" aria-label="LinkedIn" className="hover:text-primary transition-colors"><Linkedin size={20} /></Link>
-              <Link href="#" aria-label="YouTube" className="hover:text-primary transition-colors"><Youtube size={20} /></Link>
+              <Link href="https://www.facebook.com/profile.php?id=61577181247931" aria-label="Facebook" className="hover:text-primary transition-colors"><Facebook size={20} /></Link>
+              <Link href="https://x.com/nigeriansgovhub" aria-label="Twitter" className="hover:text-primary transition-colors"><Twitter size={20} /></Link>
+              <Link href="https://www.instagram.com/nigeriansgovhub/" aria-label="Instagram" className="hover:text-primary transition-colors"><Instagram size={20} /></Link>
+              {/* <Link href="#" aria-label="LinkedIn" className="hover:text-primary transition-colors"><Linkedin size={20} /></Link>
+              <Link href="#" aria-label="YouTube" className="hover:text-primary transition-colors"><Youtube size={20} /></Link> */}
             </div>
             <p className="mt-4 text-sm">
               {/* {t.ministry_info}<br /> */}
