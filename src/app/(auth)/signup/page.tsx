@@ -6,6 +6,7 @@ import { ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/language-context';
+import { Suspense } from 'react';
 
 export const dynamic = 'force-dynamic';
 export default function SignupPage() {
