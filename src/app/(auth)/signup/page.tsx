@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/language-context';
 
+export const dynamic = 'force-dynamic';
 export default function SignupPage() {
   const { dictionary } = useLanguage();
   const t = dictionary.signup_page;
