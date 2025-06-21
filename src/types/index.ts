@@ -227,14 +227,17 @@ export const projectFormSchemaRaw: ProjectFormSchemaRawTypedWithFields = {
   startDate: (z: any): any => z.date({ required_error: "Start date is required." }),
   expectedEndDate: (z: any): any => z.date().optional().nullable(),
   description: (z: any): any => z.string().min(20, "Description must be at least 20 characters."),
-  budget: (z: any): any => z.preprocess(
-    (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
+  budget: (z: any): any =>
+  z.preprocess(
+    (val: unknown) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
     z.number().positive("Budget must be a positive number.").optional().nullable()
   ),
-  expenditure: (z: any): any => z.preprocess(
-    (val) => (val === "" || val === null || val === undefined) ? undefined : Number(val),
+  expenditure: (z: any): any =>
+  z.preprocess(
+    (val: unknown) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
     z.number().positive("Expenditure must be a positive number.").optional().nullable()
   ),
+
   // Tags from the form will be a comma-separated string of names
   tags: (z: any): any => z.string().optional(),
 };
