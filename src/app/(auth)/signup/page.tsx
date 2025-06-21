@@ -27,7 +27,9 @@ export default function SignupPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SignupForm />
+            <Suspense fallback={<div>Loading form...</div>}>
+              <SignupForm />
+            </Suspense>
             <p className="mt-6 text-center text-sm text-muted-foreground">
               {t.has_account}{' '}
               <Button variant="link" asChild className="p-0 font-medium text-primary hover:text-primary/80">
