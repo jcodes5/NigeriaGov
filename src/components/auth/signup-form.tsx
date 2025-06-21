@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm, type SubmitHandler } from 'react-hook-form';
@@ -12,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { createUserAction } from '@/lib/actions';
 import { signIn } from 'next-auth/react';
+import { useLanguage } from '@/context/language-context';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -25,12 +25,14 @@ const signupSchema = z.object({
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
-export function SignupForm({ dictionary }: { dictionary: any }) {
+export function SignupForm() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+  const { dictionary } = useLanguage();
+  const t = dictionary.signup_page;
 
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -38,7 +40,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
 
   const onSubmit: SubmitHandler<SignupFormData> = async (formData) => {
     setIsLoadingCredentials(true);
-
+    
     const result = await createUserAction({
       name: formData.name,
       email: formData.email,
@@ -67,7 +69,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
       } else if (signInResult?.ok) {
         const redirectUrl = searchParams.get('redirect') || '/dashboard/user';
         router.push(redirectUrl);
-        router.refresh();
+        router.refresh(); 
       }
     } else {
       toast({
@@ -89,9 +91,9 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
 
   return (
     <div className="space-y-6">
-      <Button
-        variant="outline"
-        className="w-full button-hover"
+      <Button 
+        variant="outline" 
+        className="w-full button-hover" 
         onClick={handleGoogleSignUp}
         disabled={overallLoading}
       >
@@ -100,7 +102,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
               <path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.3 512 0 398.5 0 256S110.3 0 244 0c69.8 0 130.8 28.4 175.2 72.9L358.3 167.1C329.3 139.2 290.5 121.4 244 121.4c-73.3 0-133.5 58.4-133.5 130.6s60.2 130.6 133.5 130.6c76.8 0 114.1-51.7 117.8-76.3H244V261.8h244z"></path>
             </svg>
-            {dictionary.google_signup}
+            {t.google_signup}
           </>
         )}
       </Button>
@@ -111,14 +113,14 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-card px-2 text-muted-foreground">
-            {dictionary.or_continue_with}
+            {t.or_continue_with}
           </span>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div>
-          <Label htmlFor="name">{dictionary.name_label}</Label>
+          <Label htmlFor="name">{t.name_label}</Label>
           <Input
             id="name"
             {...register("name")}
@@ -129,7 +131,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
         </div>
 
         <div>
-          <Label htmlFor="email">{dictionary.email_label}</Label>
+          <Label htmlFor="email">{t.email_label}</Label>
           <Input
             id="email"
             type="email"
@@ -142,7 +144,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
         </div>
 
         <div>
-          <Label htmlFor="password">{dictionary.password_label}</Label>
+          <Label htmlFor="password">{t.password_label}</Label>
           <Input
             id="password"
             type="password"
@@ -155,7 +157,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
         </div>
 
         <div>
-          <Label htmlFor="confirmPassword">{dictionary.confirm_password_label}</Label>
+          <Label htmlFor="confirmPassword">{t.confirm_password_label}</Label>
           <Input
             id="confirmPassword"
             type="password"
@@ -168,7 +170,7 @@ export function SignupForm({ dictionary }: { dictionary: any }) {
         </div>
 
         <Button type="submit" className="w-full button-hover" disabled={overallLoading}>
-          {isLoadingCredentials ? dictionary.creating_account : dictionary.signup_button}
+          {isLoadingCredentials ? t.creating_account : t.signup_button}
         </Button>
       </form>
     </div>
