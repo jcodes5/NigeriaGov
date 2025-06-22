@@ -55,7 +55,7 @@ export function Footer() {
         </div>
         <div className="border-t pt-8 text-center text-sm">
           <p>{t.copyright.replace('{year}', currentYear.toString())}</p>
-          {/* <p className="mt-1">{t.initiative}</p> */}
+           <p className="mt-1">{t.initiative}</p> 
         </div>
       </div>
     </footer>
